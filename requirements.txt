@@ -36,6 +36,17 @@ supabase>=2.4.2           # Supabase Python client
 postgrest>=0.16.1         # Supabase dependency
 
 # ---------------------------------------------------------------------------
+# API servers (Front Desk Bot webhook server, Concierge Bot template API)
+# ---------------------------------------------------------------------------
+fastapi>=0.110.0
+uvicorn>=0.29.0
+
+# ---------------------------------------------------------------------------
+# Document generation (Concierge Bot — merge-tag Word doc auto-fill)
+# ---------------------------------------------------------------------------
+docxtpl>=0.16.7           # python-docx + Jinja2 merge-tag rendering
+
+# ---------------------------------------------------------------------------
 # Scheduling (optional — for running without external cron)
 # ---------------------------------------------------------------------------
 schedule>=1.2.1           # Pure-Python cron-style scheduler

@@ -178,6 +178,34 @@ BOTS: Dict[str, Dict[str, Any]] = {
         "color": "#27AE60",
     },
 
+    "concierge": {
+        "name": "Concierge",
+        "description": (
+            "Document template concierge. Catalogs, serves, and (for wired templates) "
+            "auto-fills Camelot's 23 branded document templates — management agreements, "
+            "compliance forms, leasing packages, board governance, financial reports, "
+            "and property-management paperwork."
+        ),
+        "capabilities": [
+            "list_templates",         # List/search the template catalog, optionally by category
+            "get_template",           # Full metadata + field schema for one template
+            "download_template",      # Serve a docx/pdf/fillable-PDF file
+            "generate_document",      # Auto-fill a merge-tag master with answers (wired templates only)
+        ],
+        "data_sources": [
+            "Camelot Template Library (bundled under concierge_bot/library/)",
+            "Merge-tag masters (concierge_bot/masters/)",
+        ],
+        "entry_point": "concierge_bot/main.py",
+        "api_endpoint": "http://concierge_bot:8004",
+        "api_port": 8004,
+        "health_check": "http://concierge_bot:8004/health",
+        "timeout_seconds": 30,
+        "requires_env": [],
+        "icon": "📝",
+        "color": "#2E86C1",
+    },
+
     "index": {
         "name": "Index",
         "description": (

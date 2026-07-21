@@ -2,7 +2,7 @@
 
 **AI-Powered Operating System for Camelot Property Management Services Corp**
 
-Camelot OS is a suite of 7 specialist AI bots controlled by a central orchestrator, replacing fragmented manual workflows with an intelligent, automated platform.
+Camelot OS is a suite of 8 specialist AI bots controlled by a central orchestrator, replacing fragmented manual workflows with an intelligent, automated platform.
 
 ---
 
@@ -13,15 +13,15 @@ Camelot OS is a suite of 7 specialist AI bots controlled by a central orchestrat
                     │     CAMELOT OS ORCHESTRATOR  │
                     │   (FastAPI + Router + Memory)│
                     └──────────────┬──────────────┘
-         ┌──────────┬──────────────┼──────────────┬──────────┐
-      SCOUT      BROKER       COMPLIANCE      FRONTDESK   INDEX
-    Lead Gen   Brokerage      Violations      Residents   Files
+     ┌──────────┬──────────────┼──────────────┬──────────┬────────────┐
+  SCOUT      BROKER       COMPLIANCE      FRONTDESK   INDEX      CONCIERGE
+Lead Gen   Brokerage      Violations      Residents   Files    Doc Templates
                     ├──────────────┴──────────────┐
                   REPORT                        DEAL
                 Analytics                    Roll-Up
 ```
 
-## The 7 Bots
+## The 8 Bots
 
 | Bot | Role | Stack |
 |-----|------|-------|
@@ -30,6 +30,7 @@ Camelot OS is a suite of 7 specialist AI bots controlled by a central orchestrat
 | **Compliance** | HPD/DOB/LL97 regulatory monitoring | Python |
 | **Front Desk** | Resident & owner communications | Python + Node.js |
 | **Index** | Google Drive file organization (MDS codes) | Python |
+| **Concierge** | Document template catalog, download & auto-fill | Python |
 | **Report** | Owner statements, KPI dashboards, investor updates | Python |
 | **Deal** | Roll-up acquisition outreach pipeline | Python + Node.js |
 

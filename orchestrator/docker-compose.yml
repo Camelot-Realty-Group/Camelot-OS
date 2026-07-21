@@ -9,6 +9,7 @@ version: "3.9"
 #   frontdesk_bot   — Tenant operations API (port 8001)
 #   index_bot       — Document intelligence API (port 8002)
 #   compliance_bot  — NYC regulatory compliance API (port 8003)
+#   concierge_bot   — Document template catalog & auto-fill API (port 8004)
 #
 # Usage:
 #   docker-compose up --build               # Start all services
@@ -72,9 +73,11 @@ services:
       - FRONTDESK_BOT_HOST=frontdesk_bot
       - INDEX_BOT_HOST=index_bot
       - COMPLIANCE_BOT_HOST=compliance_bot
+      - CONCIERGE_BOT_HOST=concierge_bot
       - FRONTDESK_BOT_PORT=8001
       - INDEX_BOT_PORT=8002
       - COMPLIANCE_BOT_PORT=8003
+      - CONCIERGE_BOT_PORT=8004
       # External integrations
       - HUBSPOT_API_KEY=${HUBSPOT_API_KEY}
       - HUBSPOT_PORTAL_ID=${HUBSPOT_PORTAL_ID}
@@ -95,6 +98,8 @@ services:
       index_bot:
         condition: service_healthy
       compliance_bot:
+        condition: service_healthy
+      concierge_bot:
         condition: service_healthy
     networks:
       camelot_net:
@@ -218,6 +223,35 @@ services:
       <<: *healthcheck-defaults
     labels:
       - "camelot.service=compliance_bot"
+
+  # ---------------------------------------------------------------------------
+  # CONCIERGE BOT — Document template catalog, download & auto-fill
+  # ---------------------------------------------------------------------------
+  concierge_bot:
+    build:
+      context: ..
+      dockerfile: concierge_bot/Dockerfile
+    image: camelot-os/concierge-bot:latest
+    container_name: camelot_concierge
+    <<: *common-env
+    environment:
+      - PORT=8004
+      - HOST=0.0.0.0
+      - LOG_FILE=/app/logs/concierge.log
+    ports:
+      - "${CONCIERGE_BOT_PORT:-8004}:8004"
+    volumes:
+      - camelot_logs:/app/logs
+      - camelot_data:/app/data
+    networks:
+      camelot_net:
+        ipv4_address: "172.20.0.14"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8004/health"]
+      <<: *healthcheck-defaults
+    labels:
+      - "camelot.service=concierge_bot"
 
   # ---------------------------------------------------------------------------
   # OPTIONAL: Traefik reverse proxy (for production TLS termination)

@@ -37,10 +37,10 @@
      │  :local │      │  :local │  │  :8003 │   │  :8001  │
      └─────────┘      └─────────┘  └────────┘   └─────────┘
             │               │             │              │
-     ┌──────▼──┐      ┌─────▼───┐  ┌─────▼──┐
-     │  INDEX  │      │ REPORT  │  │  DEAL  │
-     │  :8002  │      │  :local │  │  :local│
-     └─────────┘      └─────────┘  └────────┘
+     ┌──────▼──┐      ┌─────▼───┐  ┌─────▼──┐   ┌──────▼──────┐
+     │  INDEX  │      │ REPORT  │  │  DEAL  │   │  CONCIERGE  │
+     │  :8002  │      │  :local │  │  :local│   │    :8004    │
+     └─────────┘      └─────────┘  └────────┘   └─────────────┘
 
 Data Layer:
   ┌────────────┐  ┌──────────────┐  ┌─────────────┐  ┌──────────────┐
@@ -67,6 +67,7 @@ Data Layer:
 | **Compliance** | NYC regulatory compliance | `:8003` | `check_hpd`, `check_dob`, `check_ll97`, `full_audit`, `property_scorecard` |
 | **Front Desk** | Tenant ops & maintenance | `:8001` | `create_ticket`, `vendor_dispatch`, `emergency_escalate`, `tenant_message` |
 | **Index** | Document intelligence & Drive org | `:8002` | `run_indexer`, `extract_lease_data`, `search_documents`, `flag_expiring` |
+| **Concierge** | Document template catalog & auto-fill | `:8004` | `list_templates`, `get_template`, `download_template`, `generate_document` |
 | **Report** | Financial reporting & KPI analytics | Local subprocess | `send_weekly_kpi`, `monthly_financials`, `investor_memo`, `deal_memo` |
 | **Deal** | Acquisition outreach & CRM | Local subprocess | `research_target`, `build_battlecard`, `draft_email`, `log_outreach` |
 
@@ -167,9 +168,10 @@ Health check all bots.
   "bots": [
     {"id": "scout", "name": "Scout", "status": "local", "latency_ms": null},
     {"id": "frontdesk", "name": "Front Desk", "status": "online", "latency_ms": 12.4},
+    {"id": "concierge", "name": "Concierge", "status": "online", "latency_ms": 9.1},
     ...
   ],
-  "bots_online": 6,
+  "bots_online": 7,
   "bots_offline": 0
 }
 ```
@@ -302,6 +304,7 @@ Services started:
 - `frontdesk_bot` → `http://localhost:8001`
 - `index_bot` → `http://localhost:8002`
 - `compliance_bot` → `http://localhost:8003`
+- `concierge_bot` → `http://localhost:8004`
 
 ---
 
@@ -394,6 +397,7 @@ orchestrator/
     ├── compliance.txt
     ├── frontdesk.txt
     ├── index.txt
+    ├── concierge.txt
     ├── report.txt
     └── deal.txt
 ```

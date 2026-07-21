@@ -763,6 +763,38 @@ INTENT_PATTERNS: List[IntentPattern] = [
             "company": _extract_company_name(t),
         }
     ),
+
+    # -------------------------------------------------------------------
+    # CONCIERGE BOT — Document template catalog, download & auto-fill
+    # -------------------------------------------------------------------
+    (
+        80,
+        [
+            r'(fill\s+(in|out)|auto[- ]?fill|generate)\s+(a\s+|the\s+)?(work\s+order|.*\s+(form|template))',
+            r'(fill\s+(in|out))\s+.*\s+(request|form)',
+        ],
+        "concierge", "generate_document",
+        lambda t: {"query": t}
+    ),
+    (
+        81,
+        [
+            r'(download|get|send\s+me)\s+.*(agreement|form|template|cover\s+sheet|proxy|checklist|application)',
+            r'(camelot|management)\s+(agreement|template)\s+for',
+        ],
+        "concierge", "download_template",
+        lambda t: {"query": t}
+    ),
+    (
+        82,
+        [
+            r'(what\s+form|which\s+(form|template|document)|do\s+we\s+have\s+.*(form|template))',
+            r'(find|look\s+up|search\s+for)\s+.*(template|form|document)',
+            r'(document|template)\s+(library|catalog|list)',
+        ],
+        "concierge", "list_templates",
+        lambda t: {"query": t}
+    ),
 ]
 
 
@@ -853,6 +885,7 @@ def _compute_confidence(priority: int) -> float:
     Priority 50–59 → report patterns     → 0.90
     Priority 60–69 → index patterns      → 0.85
     Priority 70–79 → deal patterns       → 0.88
+    Priority 80–89 → concierge patterns  → 0.87
     """
     if priority <= 5:
         return 0.98
@@ -870,6 +903,8 @@ def _compute_confidence(priority: int) -> float:
         return 0.85
     elif 70 <= priority <= 79:
         return 0.88
+    elif 80 <= priority <= 89:
+        return 0.87
     return 0.75
 
 
@@ -900,6 +935,9 @@ def _suggest_alternatives(text: str) -> List[str]:
     if any(w in text_lower for w in ('tenant', 'unit', 'lease')):
         suggestions.append("Try: 'Create a maintenance ticket for unit [X]'")
         suggestions.append("Try: 'Message tenant in unit [X]'")
+    if any(w in text_lower for w in ('form', 'template', 'document', 'agreement', 'cover sheet')):
+        suggestions.append("Try: 'Do we have a form for [situation]?'")
+        suggestions.append("Try: 'Download the COI tracking form'")
 
     if not suggestions:
         suggestions = [
