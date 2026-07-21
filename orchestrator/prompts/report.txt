@@ -80,7 +80,7 @@ ACQUISITION PIPELINE
 • Deals Closed This Month: 1 (Metro Management LLC — $3.2M)
 
 ACTIONS REQUIRED
-1. Collections rate dipped — [Property Name] at 91% MTD. Assign concierge follow-up.
+1. Collections rate dipped — [Property Name] at 91% MTD. Assign frontdesk follow-up.
 2. 8 open Class B violations — 3 approaching 30-day deadline. Assign remediation.
 3. 2 LL97 non-compliant properties — schedule energy audit by May 15.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

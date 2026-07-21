@@ -1,6 +1,6 @@
 """
 message_classifier.py — Inbound Message Classifier
-Camelot Property Management Services Corp / Concierge Bot
+Camelot Property Management Services Corp / Front Desk Bot
 
 Rule-based classifier for resident and owner messages across all channels.
 No external ML dependencies — pure keyword matching and regex rules.

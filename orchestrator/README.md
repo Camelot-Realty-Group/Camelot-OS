@@ -33,7 +33,7 @@
 ╚══════════════════════════════════════════════════════════════════════════════╝
             │               │             │              │
      ┌──────▼──┐      ┌─────▼───┐  ┌─────▼──┐   ┌──────▼──┐
-     │  SCOUT  │      │ BROKER  │  │COMPLNCE│   │CONCIERGE│
+     │  SCOUT  │      │ BROKER  │  │COMPLNCE│   │FRONTDESK│
      │  :local │      │  :local │  │  :8003 │   │  :8001  │
      └─────────┘      └─────────┘  └────────┘   └─────────┘
             │               │             │              │
@@ -65,7 +65,7 @@ Data Layer:
 | **Scout** | Lead generation & property intelligence | Local subprocess | `search_leads`, `enrich_lead`, `push_to_hubspot`, `check_ownership` |
 | **Broker** | Transaction execution & deal docs | Local subprocess | `generate_loi`, `build_proforma`, `analyze_cap_rate`, `draft_nda` |
 | **Compliance** | NYC regulatory compliance | `:8003` | `check_hpd`, `check_dob`, `check_ll97`, `full_audit`, `property_scorecard` |
-| **Concierge** | Tenant ops & maintenance | `:8001` | `create_ticket`, `vendor_dispatch`, `emergency_escalate`, `tenant_message` |
+| **Front Desk** | Tenant ops & maintenance | `:8001` | `create_ticket`, `vendor_dispatch`, `emergency_escalate`, `tenant_message` |
 | **Index** | Document intelligence & Drive org | `:8002` | `run_indexer`, `extract_lease_data`, `search_documents`, `flag_expiring` |
 | **Report** | Financial reporting & KPI analytics | Local subprocess | `send_weekly_kpi`, `monthly_financials`, `investor_memo`, `deal_memo` |
 | **Deal** | Acquisition outreach & CRM | Local subprocess | `research_target`, `build_battlecard`, `draft_email`, `log_outreach` |
@@ -166,7 +166,7 @@ Health check all bots.
   "timestamp": "2026-04-19T14:00:00Z",
   "bots": [
     {"id": "scout", "name": "Scout", "status": "local", "latency_ms": null},
-    {"id": "concierge", "name": "Concierge", "status": "online", "latency_ms": 12.4},
+    {"id": "frontdesk", "name": "Front Desk", "status": "online", "latency_ms": 12.4},
     ...
   ],
   "bots_online": 6,
@@ -299,7 +299,7 @@ docker-compose -f orchestrator/docker-compose.yml down
 
 Services started:
 - `orchestrator` → `http://localhost:8000`
-- `concierge_bot` → `http://localhost:8001`
+- `frontdesk_bot` → `http://localhost:8001`
 - `index_bot` → `http://localhost:8002`
 - `compliance_bot` → `http://localhost:8003`
 
@@ -392,7 +392,7 @@ orchestrator/
     ├── scout.txt
     ├── broker.txt
     ├── compliance.txt
-    ├── concierge.txt
+    ├── frontdesk.txt
     ├── index.txt
     ├── report.txt
     └── deal.txt

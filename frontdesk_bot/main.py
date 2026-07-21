@@ -1,8 +1,8 @@
 """
-main.py — Concierge Bot Entry Point
+main.py — Front Desk Bot Entry Point
 Camelot Property Management Services Corp
 
-Runs the Concierge Bot polling loop: checks email inbox every N seconds,
+Runs the Front Desk Bot polling loop: checks email inbox every N seconds,
 processes messages, creates tickets, and sends responses.
 
 Optionally exposes a webhook endpoint for Twilio SMS inbound.
@@ -28,7 +28,7 @@ from pathlib import Path
 # ---------------------------------------------------------------------------
 
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
-LOG_FILE = os.getenv("LOG_FILE", "logs/concierge_bot.log")
+LOG_FILE = os.getenv("LOG_FILE", "logs/frontdesk_bot.log")
 Path("logs").mkdir(exist_ok=True)
 
 logging.basicConfig(
@@ -39,7 +39,7 @@ logging.basicConfig(
         logging.FileHandler(LOG_FILE, encoding="utf-8"),
     ],
 )
-logger = logging.getLogger("concierge_bot.main")
+logger = logging.getLogger("frontdesk_bot.main")
 
 POLL_INTERVAL_SECONDS = int(os.getenv("EMAIL_POLL_INTERVAL", "60"))
 
@@ -53,9 +53,9 @@ def run_email_loop(once: bool = False) -> None:
     Poll IMAP inbox and process all unread messages.
     Runs continuously unless once=True.
     """
-    from concierge_bot.email_handler import check_inbound_email, process_inbound_email_pipeline
+    from frontdesk_bot.email_handler import check_inbound_email, process_inbound_email_pipeline
 
-    logger.info("Concierge Bot email loop starting")
+    logger.info("Front Desk Bot email loop starting")
 
     while True:
         try:
@@ -108,20 +108,20 @@ def run_webhook_server(host: str = "0.0.0.0", port: int = 8001) -> None:
         logger.error("FastAPI/uvicorn not installed. Run: pip install fastapi uvicorn")
         sys.exit(1)
 
-    from concierge_bot.twilio_handler import (
+    from frontdesk_bot.twilio_handler import (
         receive_sms_webhook,
         process_inbound_sms,
         twiml_response,
     )
-    from concierge_bot.message_classifier import classify_message
-    from concierge_bot.response_templates import get_response
-    from concierge_bot.ticket_manager import create_ticket
+    from frontdesk_bot.message_classifier import classify_message
+    from frontdesk_bot.response_templates import get_response
+    from frontdesk_bot.ticket_manager import create_ticket
 
-    app = FastAPI(title="Camelot Concierge Bot", version="1.0.0")
+    app = FastAPI(title="Camelot Front Desk Bot", version="1.0.0")
 
     @app.get("/health")
     async def health():
-        return {"status": "ok", "service": "Camelot Concierge Bot"}
+        return {"status": "ok", "service": "Camelot Front Desk Bot"}
 
     @app.post("/sms/inbound")
     async def sms_inbound(request: Request):
@@ -182,11 +182,11 @@ def run_webhook_server(host: str = "0.0.0.0", port: int = 8001) -> None:
     @app.get("/tickets/open")
     async def open_tickets(building_id: str = ""):
         """Return open tickets for a building."""
-        from concierge_bot.ticket_manager import get_open_tickets
+        from frontdesk_bot.ticket_manager import get_open_tickets
         tickets = get_open_tickets(building_id=building_id or None)
         return JSONResponse({"tickets": tickets, "count": len(tickets)})
 
-    logger.info(f"Starting Concierge Bot webhook server on {host}:{port}")
+    logger.info(f"Starting Front Desk Bot webhook server on {host}:{port}")
     uvicorn.run(app, host=host, port=port, log_level=LOG_LEVEL.lower())
 
 
@@ -196,7 +196,7 @@ def run_webhook_server(host: str = "0.0.0.0", port: int = 8001) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Camelot Concierge Bot — Resident communication handler"
+        description="Camelot Front Desk Bot — Resident communication handler"
     )
     parser.add_argument("--once", action="store_true", help="Check email once then exit (for cron)")
     parser.add_argument("--serve", action="store_true", help="Start webhook API server")
@@ -207,7 +207,7 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.test_classify:
-        from concierge_bot.message_classifier import classify_message, describe_classification
+        from frontdesk_bot.message_classifier import classify_message, describe_classification
         result = classify_message(args.test_classify)
         print(describe_classification(result))
         return

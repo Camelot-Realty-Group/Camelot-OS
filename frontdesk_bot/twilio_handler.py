@@ -1,6 +1,6 @@
 """
 twilio_handler.py — Twilio SMS Integration
-Camelot Property Management Services Corp / Concierge Bot
+Camelot Property Management Services Corp / Front Desk Bot
 
 Handles inbound and outbound SMS via Twilio REST API.
 Inbound messages are parsed, classified, and auto-responded.
@@ -238,9 +238,9 @@ def process_inbound_sms(
     Returns:
         Processing result dict with: message, classification, ticket, response_sent.
     """
-    from concierge_bot.message_classifier import classify_message
-    from concierge_bot.ticket_manager import create_ticket
-    from concierge_bot.response_templates import get_response
+    from frontdesk_bot.message_classifier import classify_message
+    from frontdesk_bot.ticket_manager import create_ticket
+    from frontdesk_bot.response_templates import get_response
 
     parsed = receive_sms_webhook(webhook_payload)
     from_number = parsed["from_number"]

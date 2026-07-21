@@ -1,6 +1,6 @@
 """
 ticket_manager.py — Maintenance Ticket Manager
-Camelot Property Management Services Corp / Concierge Bot
+Camelot Property Management Services Corp / Front Desk Bot
 
 Creates, updates, and queries maintenance tickets stored in Supabase.
 Ticket format: CAM-YYYY-NNNN
@@ -490,7 +490,7 @@ if __name__ == "__main__":
             ticket["ticket_number"],
             status="Assigned",
             note="Assigned to Mike (maintenance) — scheduled for Thursday 10am",
-            updated_by="concierge@camelot.nyc",
+            updated_by="frontdesk@camelot.nyc",
         )
         print("\nUpdated ticket:")
         print(format_ticket_summary(updated))

@@ -56,7 +56,7 @@ You have command over seven specialist bots. Each is a domain expert. You are th
    Integrations: NYC HPD Open Data API, NYC DOB BIS, ECB database, LL97 benchmarking database.
    Key actions: check_hpd, check_dob, check_ecb, check_ll97, full_audit, property_scorecard, track_remediation.
 
-4. CONCIERGE BOT
+4. FRONTDESK BOT
    Domain: Tenant operations & maintenance management
    Calls when: Creating maintenance tickets, dispatching vendors, tenant messaging, lease inquiries, emergency escalation, work order tracking.
    Integrations: AppFolio, Buildium, Twilio, SendGrid.

@@ -1,11 +1,11 @@
 """
-response_templates.py — Concierge Bot Response Template Library
-Camelot Property Management Services Corp / Concierge Bot
+response_templates.py — Front Desk Bot Response Template Library
+Camelot Property Management Services Corp / Front Desk Bot
 
 Canned response templates for every category/urgency combination.
 Uses f-string substitution for resident name, unit, building, ticket number, ETA.
 
-All templates are signed: "Camelot Property Management Services — Your Concierge Team"
+All templates are signed: "Camelot Property Management Services — Your Front Desk Team"
 
 Author: Camelot OS
 """
@@ -16,7 +16,7 @@ from typing import Optional
 # Template signature
 # ---------------------------------------------------------------------------
 
-SIGNATURE = "\n\nWarm regards,\nCamelot Property Management Services — Your Concierge Team"
+SIGNATURE = "\n\nWarm regards,\nCamelot Property Management Services — Your Front Desk Team"
 PORTAL_LINK = "https://residents.camelot.nyc"  # Replace with actual portal URL
 
 

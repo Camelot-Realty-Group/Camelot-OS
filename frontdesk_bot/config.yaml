@@ -1,14 +1,14 @@
-# concierge_bot/config.yaml
-# Camelot Property Management Services Corp — Concierge Bot Configuration
+# frontdesk_bot/config.yaml
+# Camelot Property Management Services Corp — Front Desk Bot Configuration
 
 bot:
-  name: "Concierge Bot"
+  name: "Front Desk Bot"
   version: "1.0.0"
   environment: "production"
 
 camelot:
   company_name: "Camelot Property Management Services Corp"
-  concierge_email: "concierge@camelot.nyc"
+  frontdesk_email: "frontdesk@camelot.nyc"
   management_email: "mgr@camelot.nyc"
   leasing_email: "leasing@camelot.nyc"
   ar_email: "ar@camelot.nyc"
@@ -62,4 +62,4 @@ server:
 logging:
   level: "INFO"
   format: "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
-  file: "logs/concierge_bot.log"
+  file: "logs/frontdesk_bot.log"

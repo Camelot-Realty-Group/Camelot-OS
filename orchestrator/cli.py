@@ -80,7 +80,7 @@ BOT_COLORS = {
     "scout":      "cyan",
     "broker":     "yellow",
     "compliance": "red",
-    "concierge":  "green",
+    "frontdesk":  "green",
     "index":      "magenta",
     "report":     "bright_blue",
     "deal":       "bright_cyan",

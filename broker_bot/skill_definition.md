@@ -103,7 +103,7 @@ Camelot REIT I LLC
 
 - **Eleni Palmeri** — Broker of Record, Camelot Realty Group
 - For compliance/legal questions → route to Compliance Bot
-- For owner/resident communications → route to Concierge Bot
+- For owner/resident communications → route to Front Desk Bot
 - For deal sourcing → coordinate with Deal Bot
 
 ---

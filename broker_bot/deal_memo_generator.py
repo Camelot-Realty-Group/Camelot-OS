@@ -327,7 +327,7 @@ going-in cap rate** on underwritten NOI of **${noi:,.0f}**.
    minimum acquisition criteria for {property_data.borough_or_county} assets.
 
 2. **Camelot OS Integration:** Upon acquisition, Camelot's proprietary OS will be deployed 
-   for property management, resident communications (Concierge Bot), compliance monitoring 
+   for property management, resident communications (Front Desk Bot), compliance monitoring 
    (Compliance Bot), and owner reporting (Report Bot), immediately improving operational 
    efficiency and NOI.
 

@@ -504,7 +504,7 @@ INTENT_PATTERNS: List[IntentPattern] = [
     ),
 
     # -------------------------------------------------------------------
-    # CONCIERGE BOT — Tenant operations & maintenance
+    # FRONTDESK BOT — Tenant operations & maintenance
     # -------------------------------------------------------------------
     (
         40,
@@ -514,7 +514,7 @@ INTENT_PATTERNS: List[IntentPattern] = [
             r'(leak|heat|hot\s+water|hvac|plumbing|electrical|repair)\s+(issue|problem|out|broken)',
             r'unit\s+\w+\s+(has|reports?|says?|need)',
         ],
-        "concierge", "create_ticket",
+        "frontdesk", "create_ticket",
         lambda t: {
             "unit": _extract_unit(t),
             "address": _extract_address(t),
@@ -528,7 +528,7 @@ INTENT_PATTERNS: List[IntentPattern] = [
             r'(call|contact)\s+(plumber|electrician|handyman|super|contractor)',
             r'vendor\s+dispatch\s+for',
         ],
-        "concierge", "vendor_dispatch",
+        "frontdesk", "vendor_dispatch",
         lambda t: {
             "unit": _extract_unit(t),
             "address": _extract_address(t),
@@ -542,7 +542,7 @@ INTENT_PATTERNS: List[IntentPattern] = [
             r'escalate\s+(this\s+)?(immediately|now|urgent)',
             r'(call|page)\s+(on[- ]call|emergency)',
         ],
-        "concierge", "emergency_escalate",
+        "frontdesk", "emergency_escalate",
         lambda t: {
             "unit": _extract_unit(t),
             "address": _extract_address(t),
@@ -557,7 +557,7 @@ INTENT_PATTERNS: List[IntentPattern] = [
             r'send\s+.*(tenant|resident)\s+(message|notice|notification)',
             r'notify\s+(tenant|resident)\s+in\s+unit',
         ],
-        "concierge", "tenant_message",
+        "frontdesk", "tenant_message",
         lambda t: {
             "unit": _extract_unit(t),
             "address": _extract_address(t),
@@ -571,7 +571,7 @@ INTENT_PATTERNS: List[IntentPattern] = [
             r'(what\'?s?\s+the\s+)?status\s+(of\s+)?(ticket|work\s+order)',
             r'open\s+(tickets?|work\s+orders?)',
         ],
-        "concierge", "ticket_status",
+        "frontdesk", "ticket_status",
         lambda t: {
             "address": _extract_address(t),
             "unit": _extract_unit(t),
@@ -849,7 +849,7 @@ def _compute_confidence(priority: int) -> float:
     Priority 10–19 → scout patterns      → 0.92
     Priority 20–29 → broker patterns     → 0.92
     Priority 30–39 → compliance patterns → 0.95 (more specific)
-    Priority 40–49 → concierge patterns  → 0.88
+    Priority 40–49 → frontdesk patterns  → 0.88
     Priority 50–59 → report patterns     → 0.90
     Priority 60–69 → index patterns      → 0.85
     Priority 70–79 → deal patterns       → 0.88

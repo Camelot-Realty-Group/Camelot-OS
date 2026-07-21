@@ -35,7 +35,7 @@ supabase:
     sessions: "orchestrator_sessions"
     session_meta: "orchestrator_session_meta"
     leads: "scout_leads"
-    tickets: "concierge_tickets"
+    tickets: "frontdesk_tickets"
     violations: "compliance_violations"
     documents: "index_documents"
     deals: "deal_pipeline"
@@ -185,10 +185,10 @@ bots:
       tier_1_tons_co2e_per_sqft: 0.00675      # 2024–2029 standard
       tier_2_tons_co2e_per_sqft: 0.00407      # 2030–2034 standard
 
-  concierge:
+  frontdesk:
     enabled: true
-    entry_point: "concierge_bot/main.py"
-    api_endpoint: "http://concierge_bot:8001"
+    entry_point: "frontdesk_bot/main.py"
+    api_endpoint: "http://frontdesk_bot:8001"
     timeout_seconds: 30
     priority_levels:
       - "emergency"                           # Life/safety — respond within 1 hour

@@ -135,8 +135,8 @@ BOTS: Dict[str, Dict[str, Any]] = {
         "color": "#E74C3C",
     },
 
-    "concierge": {
-        "name": "Concierge",
+    "frontdesk": {
+        "name": "Front Desk",
         "description": (
             "Tenant operations and maintenance management. Creates and routes maintenance "
             "tickets, handles tenant communication, dispatches vendors, manages lease "
@@ -159,10 +159,10 @@ BOTS: Dict[str, Dict[str, Any]] = {
             "SendGrid (email)",
             "Internal vendor database (Supabase)",
         ],
-        "entry_point": "concierge_bot/main.py",
-        "api_endpoint": "http://concierge_bot:8001",
+        "entry_point": "frontdesk_bot/main.py",
+        "api_endpoint": "http://frontdesk_bot:8001",
         "api_port": 8001,
-        "health_check": "http://concierge_bot:8001/health",
+        "health_check": "http://frontdesk_bot:8001/health",
         "timeout_seconds": 30,
         "requires_env": [
             "APPFOLIO_API_KEY",

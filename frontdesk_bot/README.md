@@ -1,4 +1,4 @@
-# Concierge Bot
+# Front Desk Bot
 ## Camelot Property Management Services Corp
 
 AI-powered resident and owner communication handler. Processes inbound messages via email, SMS, and web chat — classifies urgency, creates maintenance tickets, and sends threaded responses automatically.

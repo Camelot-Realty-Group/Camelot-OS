@@ -1,8 +1,8 @@
 """
 email_handler.py — Email Handler (IMAP + SMTP)
-Camelot Property Management Services Corp / Concierge Bot
+Camelot Property Management Services Corp / Front Desk Bot
 
-Polls concierge@camelot.nyc via IMAP for inbound messages,
+Polls frontdesk@camelot.nyc via IMAP for inbound messages,
 classifies them, creates tickets, and sends threaded responses.
 
 Thread convention: Subject line prefixed with "[CAM-YYYY-NNNN] Re: ..."
@@ -32,22 +32,22 @@ logger = logging.getLogger(__name__)
 
 IMAP_HOST = os.getenv("IMAP_HOST", "imap.gmail.com")
 IMAP_PORT = int(os.getenv("IMAP_PORT", "993"))
-IMAP_USER = os.getenv("IMAP_USER", "concierge@camelot.nyc")
+IMAP_USER = os.getenv("IMAP_USER", "frontdesk@camelot.nyc")
 IMAP_PASSWORD = os.getenv("IMAP_PASSWORD", "")
 IMAP_MAILBOX = os.getenv("IMAP_MAILBOX", "INBOX")
 
 SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
-SMTP_USER = os.getenv("SMTP_USER", "concierge@camelot.nyc")
+SMTP_USER = os.getenv("SMTP_USER", "frontdesk@camelot.nyc")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
-SMTP_FROM = os.getenv("SMTP_FROM", "Camelot Concierge <concierge@camelot.nyc>")
+SMTP_FROM = os.getenv("SMTP_FROM", "Camelot Front Desk <frontdesk@camelot.nyc>")
 
 # Email signature block
 EMAIL_FOOTER = """
 
 ---
-Camelot Property Management Services — Your Concierge Team
-📧 concierge@camelot.nyc | 📞 (212) 555-0199
+Camelot Property Management Services — Your Front Desk Team
+📧 frontdesk@camelot.nyc | 📞 (212) 555-0199
 🌐 https://residents.camelot.nyc
 
 This email was sent in response to your inquiry. Please reply to this thread to keep your request organized.
@@ -375,9 +375,9 @@ def process_inbound_email_pipeline(
     Returns:
         Processing result dict.
     """
-    from concierge_bot.message_classifier import classify_message
-    from concierge_bot.ticket_manager import create_ticket, update_ticket_status, get_ticket
-    from concierge_bot.response_templates import get_response
+    from frontdesk_bot.message_classifier import classify_message
+    from frontdesk_bot.ticket_manager import create_ticket, update_ticket_status, get_ticket
+    from frontdesk_bot.response_templates import get_response
 
     from_email = parsed_email.from_address
     body = parsed_email.body_text
@@ -552,7 +552,7 @@ def _text_to_html(text: str, ticket_number: str) -> str:
     {escaped}
   </div>
   <div style="background: #f5f5f5; padding: 12px 24px; font-size: 11px; color: #999; border-top: 1px solid #eee;">
-    Camelot Property Management Services | concierge@camelot.nyc | (212) 555-0199
+    Camelot Property Management Services | frontdesk@camelot.nyc | (212) 555-0199
   </div>
 </body>
 </html>"""
@@ -578,7 +578,7 @@ if __name__ == "__main__":
         success = send_response(
             to_email=to,
             subject="Test Maintenance Request",
-            body="This is a test response from Camelot Concierge Bot.",
+            body="This is a test response from Camelot Front Desk Bot.",
             ticket_number="CAM-2026-0001",
         )
         print(f"Send result: {'Success' if success else 'Failed'}")

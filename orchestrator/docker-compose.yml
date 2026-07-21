@@ -6,7 +6,7 @@ version: "3.9"
 #
 # Services:
 #   orchestrator    — FastAPI master router (port 8000)
-#   concierge_bot   — Tenant operations API (port 8001)
+#   frontdesk_bot   — Tenant operations API (port 8001)
 #   index_bot       — Document intelligence API (port 8002)
 #   compliance_bot  — NYC regulatory compliance API (port 8003)
 #
@@ -69,10 +69,10 @@ services:
       - PORT=8000
       - LOG_FILE=/app/logs/orchestrator.log
       # Internal bot endpoints (Docker network hostnames)
-      - CONCIERGE_BOT_HOST=concierge_bot
+      - FRONTDESK_BOT_HOST=frontdesk_bot
       - INDEX_BOT_HOST=index_bot
       - COMPLIANCE_BOT_HOST=compliance_bot
-      - CONCIERGE_BOT_PORT=8001
+      - FRONTDESK_BOT_PORT=8001
       - INDEX_BOT_PORT=8002
       - COMPLIANCE_BOT_PORT=8003
       # External integrations
@@ -90,7 +90,7 @@ services:
       # Mount prompts directory for live reload
       - ./prompts:/app/orchestrator/prompts:ro
     depends_on:
-      concierge_bot:
+      frontdesk_bot:
         condition: service_healthy
       index_bot:
         condition: service_healthy
@@ -112,19 +112,19 @@ services:
       - "traefik.http.routers.orchestrator.tls.certresolver=letsencrypt"
 
   # ---------------------------------------------------------------------------
-  # CONCIERGE BOT — Tenant operations and maintenance management
+  # FRONTDESK BOT — Tenant operations and maintenance management
   # ---------------------------------------------------------------------------
-  concierge_bot:
+  frontdesk_bot:
     build:
       context: ..
-      dockerfile: concierge_bot/Dockerfile
-    image: camelot-os/concierge-bot:latest
-    container_name: camelot_concierge
+      dockerfile: frontdesk_bot/Dockerfile
+    image: camelot-os/frontdesk-bot:latest
+    container_name: camelot_frontdesk
     <<: *common-env
     environment:
       - PORT=8001
       - HOST=0.0.0.0
-      - LOG_FILE=/app/logs/concierge.log
+      - LOG_FILE=/app/logs/frontdesk.log
       - APPFOLIO_API_KEY=${APPFOLIO_API_KEY}
       - APPFOLIO_CLIENT_ID=${APPFOLIO_CLIENT_ID}
       - BUILDIUM_API_KEY=${BUILDIUM_API_KEY}
@@ -134,9 +134,9 @@ services:
       - TWILIO_EMERGENCY_NUMBER=${TWILIO_EMERGENCY_NUMBER}
       - SENDGRID_API_KEY=${SENDGRID_API_KEY}
       - SENDGRID_FROM_EMAIL=${SENDGRID_FROM_EMAIL:-ops@camelotpms.com}
-      - CONCIERGE_EMERGENCY_ESCALATION_EMAIL=${CONCIERGE_EMERGENCY_ESCALATION_EMAIL:-emergency@camelotpms.com}
+      - FRONTDESK_EMERGENCY_ESCALATION_EMAIL=${FRONTDESK_EMERGENCY_ESCALATION_EMAIL:-emergency@camelotpms.com}
     ports:
-      - "${CONCIERGE_BOT_PORT:-8001}:8001"
+      - "${FRONTDESK_BOT_PORT:-8001}:8001"
     volumes:
       - camelot_logs:/app/logs
       - camelot_data:/app/data
@@ -148,7 +148,7 @@ services:
       test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
       <<: *healthcheck-defaults
     labels:
-      - "camelot.service=concierge_bot"
+      - "camelot.service=frontdesk_bot"
 
   # ---------------------------------------------------------------------------
   # INDEX BOT — Document intelligence and Google Drive organization

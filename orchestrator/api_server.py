@@ -86,7 +86,7 @@ app = FastAPI(
     title="Camelot OS Orchestrator API",
     description=(
         "Central AI router and command layer for Camelot Property Management. "
-        "Routes requests to Scout, Broker, Compliance, Concierge, Index, Report, and Deal bots."
+        "Routes requests to Scout, Broker, Compliance, Front Desk, Index, Report, and Deal bots."
     ),
     version="1.0.0",
     lifespan=lifespan,
