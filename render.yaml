@@ -1,0 +1,76 @@
+# =============================================================================
+# Camelot OS — Render Blueprint
+#
+# Deploys the two web-facing services:
+#   camelot-os-orchestrator — master router + dashboard (FastAPI, port from $PORT)
+#   camelot-os-concierge    — document template catalog & auto-fill API
+#
+# The other bots (Scout, Broker, Report, Deal, Compliance, Front Desk, Index)
+# run as local subprocesses / cron jobs or via docker-compose on a VM — they
+# are not deployed as Render web services by default. Uncomment the cron
+# block below to run the daily Scout collection on Render.
+#
+# Render runs each service with:  pip install -r requirements.txt
+# and starts it with the startCommand. $PORT is injected by Render.
+# =============================================================================
+
+services:
+  - type: web
+    name: camelot-os-orchestrator
+    runtime: python
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: python orchestrator/api_server.py
+    healthCheckPath: /status
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11"
+      - key: HOST
+        value: "0.0.0.0"
+      - key: LOG_LEVEL
+        value: INFO
+      # Point the orchestrator at the Concierge service's public URL
+      - key: CONCIERGE_BOT_HOST
+        fromService:
+          type: web
+          name: camelot-os-concierge
+          property: host
+      - key: CONCIERGE_BOT_PORT
+        value: "443"
+      # Fill these in the Render dashboard (sync: false = set manually)
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: HUBSPOT_API_KEY
+        sync: false
+      - key: NYC_OPEN_DATA_APP_TOKEN
+        sync: false
+
+  - type: web
+    name: camelot-os-concierge
+    runtime: python
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: python concierge_bot/main.py --serve --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11"
+      - key: LOG_LEVEL
+        value: INFO
+
+  # ---------------------------------------------------------------------------
+  # OPTIONAL: daily Scout Bot run (uncomment to enable)
+  # ---------------------------------------------------------------------------
+  # - type: cron
+  #   name: camelot-os-scout-daily
+  #   runtime: python
+  #   schedule: "0 11 * * *"   # 7:00 AM Eastern (UTC-4)
+  #   buildCommand: pip install -r requirements.txt
+  #   startCommand: python main.py
+  #   envVars:
+  #     - key: PYTHON_VERSION
+  #       value: "3.11"

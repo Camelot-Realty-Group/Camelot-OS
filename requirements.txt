@@ -36,10 +36,11 @@ supabase>=2.4.2           # Supabase Python client
 postgrest>=0.16.1         # Supabase dependency
 
 # ---------------------------------------------------------------------------
-# API servers (Front Desk Bot webhook server, Concierge Bot template API)
+# API servers (Orchestrator, Front Desk Bot, Concierge Bot)
 # ---------------------------------------------------------------------------
 fastapi>=0.110.0
 uvicorn>=0.29.0
+httpx>=0.27.0             # orchestrator → bot API calls (api_server.py)
 
 # ---------------------------------------------------------------------------
 # Document generation (Concierge Bot — merge-tag Word doc auto-fill)

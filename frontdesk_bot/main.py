@@ -172,6 +172,26 @@ def run_webhook_server(host: str = "0.0.0.0", port: int = 8001) -> None:
             ticket_number=ticket_number,
         )
 
+        # Fair-housing guardrail: screen outbound text before it reaches a
+        # resident. Blocking findings replace the message with a neutral
+        # acknowledgment and flag the ticket for human review.
+        try:
+            from utils.fair_housing_guard import check_text
+            guard = check_text(response)
+            if guard.blocking:
+                logger.warning(
+                    "Fair-housing guard blocked outbound chat response "
+                    f"(ticket {ticket_number}): "
+                    f"{[f.matched for f in guard.blocking]}"
+                )
+                response = (
+                    f"Hi {resident_name}, we've received your request and created "
+                    f"ticket #{ticket_number}. A member of our team will follow up "
+                    "with you directly."
+                )
+        except ImportError:
+            pass  # repo-root utils not importable in this runtime; skip screen
+
         return JSONResponse({
             "response": response,
             "ticket_number": ticket_number,

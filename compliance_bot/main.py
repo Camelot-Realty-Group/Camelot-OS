@@ -172,6 +172,80 @@ def run(
 
 
 # ---------------------------------------------------------------------------
+# API server (FastAPI) — used by the orchestrator (bot_registry :8003)
+# ---------------------------------------------------------------------------
+
+def run_api_server(host: str = "0.0.0.0", port: int = 8003) -> None:
+    """
+    Start the Compliance Bot API server expected by the orchestrator and
+    docker-compose (health check at /health).
+
+    Endpoints:
+        GET  /health
+        POST /scan            — body: {"portfolio": [...], "dry_run": true}
+                                 (omit portfolio to use PORTFOLIO_JSON/sample)
+        GET  /building/{bbl}   — on-demand single-building scan (dry run)
+    """
+    try:
+        import uvicorn
+        from fastapi import FastAPI
+        from fastapi.responses import JSONResponse
+        from pydantic import BaseModel
+    except ImportError:
+        logger.error("FastAPI/uvicorn not installed. Run: pip install -r requirements.txt")
+        sys.exit(1)
+
+    from compliance_bot.alerts import run_compliance_scan, generate_alert_digest
+
+    app = FastAPI(title="Camelot Compliance Bot", version="1.0.0")
+
+    class ScanRequest(BaseModel):
+        portfolio: list | None = None
+        dry_run: bool = True
+        include_hpd: bool = True
+        include_dob: bool = True
+        include_ll97: bool = True
+        include_rent_stab: bool = True
+
+    @app.get("/health")
+    async def health():
+        return {"status": "ok", "service": "Camelot Compliance Bot"}
+
+    @app.post("/scan")
+    async def scan(body: ScanRequest):
+        portfolio = body.portfolio or load_portfolio(os.getenv("PORTFOLIO_JSON", "portfolio.json"))
+        result = run_compliance_scan(
+            portfolio,
+            include_hpd=body.include_hpd,
+            include_dob=body.include_dob,
+            include_ll97=body.include_ll97,
+            include_rent_stab=body.include_rent_stab,
+        )
+        return JSONResponse({
+            "scan_timestamp": result.scan_timestamp,
+            "buildings_scanned": len(portfolio),
+            "critical_count": result.critical_count,
+            "errors": result.errors,
+            "digest": generate_alert_digest(result),
+        })
+
+    @app.get("/building/{bbl}")
+    async def building_scan(bbl: str):
+        portfolio = load_portfolio(os.getenv("PORTFOLIO_JSON", "portfolio.json"))
+        subset = [b for b in portfolio if b.get("bbl") == bbl] or [{"address": bbl, "bbl": bbl}]
+        result = run_compliance_scan(subset)
+        return JSONResponse({
+            "bbl": bbl,
+            "scan_timestamp": result.scan_timestamp,
+            "critical_count": result.critical_count,
+            "digest": generate_alert_digest(result),
+        })
+
+    logger.info(f"Starting Compliance Bot API server on {host}:{port}")
+    uvicorn.run(app, host=host, port=port, log_level=LOG_LEVEL.lower())
+
+
+# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
@@ -212,8 +286,19 @@ def main() -> None:
         default=None,
         help="Email recipients (overrides defaults)",
     )
+    parser.add_argument(
+        "--serve", action="store_true", help="Start the API server (used by orchestrator)"
+    )
+    parser.add_argument("--host", default=os.getenv("HOST", "0.0.0.0"), help="API server host")
+    parser.add_argument(
+        "--port", type=int, default=int(os.getenv("PORT", "8003")), help="API server port"
+    )
 
     args = parser.parse_args()
+
+    if args.serve:
+        run_api_server(host=args.host, port=args.port)
+        return
 
     portfolio = load_portfolio(args.portfolio)
 

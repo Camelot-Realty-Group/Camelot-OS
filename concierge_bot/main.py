@@ -75,6 +75,18 @@ def run_api_server(host: str = "0.0.0.0", port: int = 8004) -> None:
 
     import docgen
 
+    # Audit trail (repo root on path when run from root or via Docker PYTHONPATH)
+    try:
+        from utils.audit_log import audit_event
+    except ImportError:
+        sys.path.insert(0, str(BOT_DIR.parent))
+        try:
+            from utils.audit_log import audit_event
+        except ImportError:
+            def audit_event(**kwargs):  # degrade gracefully outside repo layout
+                logger.info("AUDIT (fallback): %s", kwargs)
+                return kwargs
+
     app = FastAPI(title="Camelot Concierge Bot", version="1.0.0",
                   description="Document template catalog, download, and auto-fill service.")
 
@@ -123,6 +135,8 @@ def run_api_server(host: str = "0.0.0.0", port: int = 8004) -> None:
         if not file_path.exists():
             raise HTTPException(status_code=404, detail=f"File missing on disk: {filename}")
 
+        audit_event(bot="concierge", action="download_template",
+                    detail={"template_id": template_id, "fmt": fmt, "file": filename})
         return FileResponse(path=str(file_path), filename=filename)
 
     @app.post("/templates/{template_id}/generate")
@@ -140,10 +154,17 @@ def run_api_server(host: str = "0.0.0.0", port: int = 8004) -> None:
         try:
             docx_bytes = docgen.generate_docx(template_id, body.answers)
         except docgen.TemplateNotAutofillable as exc:
+            audit_event(bot="concierge", action="generate_document", outcome="denied",
+                        detail={"template_id": template_id, "reason": "not_autofillable"})
             raise HTTPException(status_code=400, detail=str(exc))
         except FileNotFoundError as exc:
+            audit_event(bot="concierge", action="generate_document", outcome="error",
+                        detail={"template_id": template_id, "reason": "master_missing"})
             raise HTTPException(status_code=500, detail=str(exc))
 
+        audit_event(bot="concierge", action="generate_document",
+                    detail={"template_id": template_id,
+                            "fields_answered": sorted(body.answers.keys())})
         return StreamingResponse(
             io.BytesIO(docx_bytes),
             media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",

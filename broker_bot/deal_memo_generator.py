@@ -199,6 +199,21 @@ def generate_deal_memo(
             f"{abs(spread):.2f}% {direction} the submarket average of {market_data.avg_cap_rate_pct:.2f}%."
         )
 
+    # Pre-render conditional sections whose expressions contain backslashes
+    # (f-string expressions cannot include backslashes on Python < 3.12)
+    property_description_section = (
+        f"### Property Description\n\n{property_data.description}"
+        if property_data.description else ""
+    )
+    comparable_sales_section = (
+        f"### Comparable Sales Summary\n\n{market_data.comparable_sales_summary}"
+        if market_data.comparable_sales_summary else ""
+    )
+    debt_or_cash_section = (
+        _debt_section(financials) if financials.loan_amount
+        else "### 4d. All-Cash Acquisition\n\nNo financing assumed in this analysis."
+    )
+
     memo = f"""{confidential_header}# INVESTMENT DEAL MEMO
 
 **Property:** {property_data.address}  
@@ -245,7 +260,7 @@ going-in cap rate** on underwritten NOI of **${noi:,.0f}**.
 
 {f"**Recent Renovations:** {property_data.recent_renovations}" if property_data.recent_renovations else ""}
 
-{f"### Property Description\n\n{property_data.description}" if property_data.description else ""}
+{property_description_section}
 
 ---
 
@@ -267,7 +282,7 @@ going-in cap rate** on underwritten NOI of **${noi:,.0f}**.
 
 {f"**Employment Drivers:** {market_data.employment_drivers}" if market_data.employment_drivers else ""}
 
-{f"### Comparable Sales Summary\n\n{market_data.comparable_sales_summary}" if market_data.comparable_sales_summary else ""}
+{comparable_sales_section}
 
 ---
 
@@ -314,7 +329,7 @@ going-in cap rate** on underwritten NOI of **${noi:,.0f}**.
 {f"| Cash-on-Cash Return | {cash_on_cash:.2f}% |" if cash_on_cash else ""}
 {f"| Estimated 5-Year IRR | {irr_est:.1f}% |" if irr_est else ""}
 
-{_debt_section(financials) if financials.loan_amount else "### 4d. All-Cash Acquisition\n\nNo financing assumed in this analysis."}
+{debt_or_cash_section}
 
 {comp_context}
 
@@ -376,7 +391,8 @@ going-in cap rate** on underwritten NOI of **${noi:,.0f}**.
 > Camelot Property Management Services Corp and its affiliates make no warranty 
 > as to the accuracy or completeness of the information herein.
 """
-    logger.info(f"Generated deal memo for {property_data.address} — NOI ${noi:,.0f}, Cap {f'{cap_rate:.2f}%' if cap_rate else 'N/A'}")
+    cap_rate_str = f"{cap_rate:.2f}%" if cap_rate else "N/A"
+    logger.info(f"Generated deal memo for {property_data.address} — NOI ${noi:,.0f}, Cap {cap_rate_str}")
     return memo
 
 
