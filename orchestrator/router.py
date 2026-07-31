@@ -247,7 +247,9 @@ INTENT_PATTERNS: List[IntentPattern] = [
         4,
         [
             r'(full|complete)\s+(compliance\s+audit|audit)',
-            r'(audit|inspect)\s+.*property',
+            # Negative lookahead keeps "audit this property's expenses" out of the
+            # compliance pipeline — that is a costbeat request, not a violations pull.
+            r'(?!.*(?:budget|expense|spend|operating\s+cost))(audit|inspect)\s+.*property',
             r'compliance\s+check\s+on',
         ],
         "compliance", "full_audit",
@@ -493,7 +495,9 @@ INTENT_PATTERNS: List[IntentPattern] = [
     (
         36,
         [
-            r'(compliance\s+)?(score|scorecard|grade|rating)',
+            # Word boundaries matter here: without them "rating" matches inside
+            # "operating", pulling every operating-budget request into compliance.
+            r'(compliance\s+)?\b(score|scorecard|grade|rating)\b',
             r'what\'?s?\s+(the\s+)?compliance\s+(status|score)',
             r'(remediation|violation)\s+plan',
         ],
@@ -795,6 +799,68 @@ INTENT_PATTERNS: List[IntentPattern] = [
         "concierge", "list_templates",
         lambda t: {"query": t}
     ),
+
+    # -------------------------------------------------------------------
+    # COSTBEAT BOT — Operating-budget cost-beat analysis & fee proposal
+    # -------------------------------------------------------------------
+    (
+        90,
+        [
+            r'(list|show\s+me|pull\s+up)\s+.*(cost[- ]?beat|budget|savings)\s+analys[ei]s',
+            r'(cost[- ]?beat|savings)\s+analys[ei]s\s+(list|history)',
+        ],
+        "costbeat", "list_analyses",
+        lambda t: {"query": t}
+    ),
+    (
+        91,
+        [
+            r'cost[- ]?beat',
+            r'(beat|undercut)\s+.*(budget|expenses?|operating\s+costs?)',
+        ],
+        "costbeat", "analyze_budget",
+        lambda t: {"query": t, "address": _extract_address(t)}
+    ),
+    (
+        92,
+        [
+            r'(review|analyz|analys|check|look\s+at)\w*\s+(this\s+|the\s+|their\s+)?(operating\s+)?budget',
+            r'(budget|expenses?)\s+(review|analysis|comparison)',
+            r'(where|how)\s+can\s+(we|they)\s+save\s+.*(money|expenses?|budget|operating)',
+        ],
+        "costbeat", "analyze_budget",
+        lambda t: {"query": t, "address": _extract_address(t)}
+    ),
+    (
+        93,
+        [
+            r'(audit|review)\s+(this\s+|the\s+|their\s+)?(building|property)?\s*\'?s?\s*(operating\s+)?(expenses?|spend|costs?)',
+            r'(are|is)\s+(this|their|the)\s+.*(expenses?|costs?|budget)\s+.*(high|too\s+high|out\s+of\s+line)',
+            r'(expense|cost)\s+(comparison|benchmark\w*)\s+(against|vs\.?|versus)',
+        ],
+        "costbeat", "analyze_budget",
+        lambda t: {"query": t, "address": _extract_address(t)}
+    ),
+    (
+        94,
+        [
+            r'(compare|benchmark)\s+.*(against|vs\.?|versus|to)\s+.*(our|camelot|portfolio|comparable)',
+            r'(what|how much)\s+(would|should)\s+.*(cost|run)\s+.*(under|with)\s+camelot',
+        ],
+        "costbeat", "analyze_budget",
+        lambda t: {"query": t, "address": _extract_address(t)}
+    ),
+    (
+        95,
+        [
+            r'(increase|raise|justify|uplift)\s+.*(management\s+fee|mgmt\s+fee)',
+            r'management\s+fee\s+(increase|uplift|bump)',
+            r'(one[- ]?time|cost[- ]?recovery)\s+fee',
+            r'(savings[- ]?capture|fee\s+proposal)',
+        ],
+        "costbeat", "build_fee_proposal",
+        lambda t: {"query": t}
+    ),
 ]
 
 
@@ -886,6 +952,7 @@ def _compute_confidence(priority: int) -> float:
     Priority 60–69 → index patterns      → 0.85
     Priority 70–79 → deal patterns       → 0.88
     Priority 80–89 → concierge patterns  → 0.87
+    Priority 90–99 → costbeat patterns   → 0.90
     """
     if priority <= 5:
         return 0.98
@@ -905,6 +972,8 @@ def _compute_confidence(priority: int) -> float:
         return 0.88
     elif 80 <= priority <= 89:
         return 0.87
+    elif 90 <= priority <= 99:
+        return 0.90
     return 0.75
 
 
@@ -938,6 +1007,9 @@ def _suggest_alternatives(text: str) -> List[str]:
     if any(w in text_lower for w in ('form', 'template', 'document', 'agreement', 'cover sheet')):
         suggestions.append("Try: 'Do we have a form for [situation]?'")
         suggestions.append("Try: 'Download the COI tracking form'")
+    if any(w in text_lower for w in ('budget', 'expense', 'savings', 'fee', 'operating cost')):
+        suggestions.append("Try: 'Review this operating budget for savings'")
+        suggestions.append("Try: 'Run a cost-beat analysis on [address]'")
 
     if not suggestions:
         suggestions = [

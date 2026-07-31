@@ -206,6 +206,42 @@ BOTS: Dict[str, Dict[str, Any]] = {
         "color": "#2E86C1",
     },
 
+    "costbeat": {
+        "name": "CostBeat",
+        "description": (
+            "Operating-budget cost-beat analysis. Parses a building's expense budget, "
+            "compares every line against Camelot's own managed portfolio at a comparable "
+            "unit count, sets a conservative target with the named comparable as evidence, "
+            "and prices two ways for Camelot to capture a share of the savings — a one-time "
+            "cost-recovery fee or a permanent management-fee uplift."
+        ),
+        "capabilities": [
+            "analyze_budget",         # Parse an uploaded budget and run the full cost-beat analysis
+            "list_analyses",          # List stored cost-beat analyses
+            "get_analysis",           # Retrieve one full stored analysis
+            "generate_report",        # Regenerate and serve the branded cost-beat PDF
+            "build_fee_proposal",     # Price the one-time fee and the management-fee uplift
+        ],
+        "data_sources": [
+            "Uploaded operating budgets (.xlsx, .csv, .pdf)",
+            "Supabase portfolio_benchmarks (Camelot's own managed-building costs)",
+            "Supabase costbeat_analyses (issued analyses)",
+            "OpenAI (recommendation prose only — never dollar figures)",
+        ],
+        "entry_point": "costbeat_bot/main.py",
+        "api_endpoint": "http://costbeat_bot:8005",
+        "api_port": 8005,
+        "health_check": "http://costbeat_bot:8005/health",
+        "timeout_seconds": 120,
+        "requires_env": [
+            "SUPABASE_URL",
+            "SUPABASE_SERVICE_KEY",
+            "OPENAI_API_KEY",
+        ],
+        "icon": "💵",
+        "color": "#1E7A45",
+    },
+
     "index": {
         "name": "Index",
         "description": (
