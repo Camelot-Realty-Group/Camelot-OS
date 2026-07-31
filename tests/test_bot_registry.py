@@ -2,11 +2,11 @@
 import bot_registry
 
 
-def test_eight_bots_registered():
-    assert len(bot_registry.BOTS) == 8
+def test_nine_bots_registered():
+    assert len(bot_registry.BOTS) == 9
     assert set(bot_registry.BOTS) == {
         "scout", "broker", "compliance", "frontdesk",
-        "index", "concierge", "report", "deal",
+        "index", "concierge", "report", "deal", "costbeat",
     }
 
 
@@ -39,6 +39,6 @@ def test_validate_action():
 
 def test_summary_shape():
     summary = bot_registry.get_bot_summary()
-    assert len(summary) == 8
+    assert len(summary) == 9
     for item in summary:
         assert {"id", "name", "description", "capabilities", "icon"} <= set(item)
