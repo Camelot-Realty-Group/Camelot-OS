@@ -1,0 +1,115 @@
+# perseus_bot/config.yaml
+# Camelot Property Management Services Corp — Perseus Configuration
+
+bot:
+  name: "Perseus"
+  version: "1.0.0"
+  environment: "production"
+
+camelot:
+  company_name: "Camelot Property Management Services Corp"
+  analysis_email: "ops@camelot.nyc"
+
+server:
+  host: "0.0.0.0"
+  port: 8006
+
+# ---------------------------------------------------------------------------
+# Per-period fee proposal. Each period is priced on its own: nothing is carried
+# forward from a prior quarter, and nothing is netted against CostBeat Bot's
+# annual-budget proposal for the same building.
+# ---------------------------------------------------------------------------
+fees:
+  # One-time fee: share of the savings identified for THIS period, billed once.
+  one_time_fee_pct_of_savings: 0.33
+  # Management-fee uplift: share of the newly-identified savings annualized,
+  # added to the monthly management fee going forward.
+  mgmt_fee_uplift_pct_of_annual_savings: 0.15
+
+# ---------------------------------------------------------------------------
+# Variance thresholds
+# ---------------------------------------------------------------------------
+variance:
+  # Actual above its prorated budget share by more than this is flagged
+  # "Investigate". A flag is a question for the manager, not a savings claim.
+  budget_overrun_flag_pct: 0.10
+  # Actual below its prorated share by more than this is flagged "Underspent" —
+  # usually a timing difference or deferred work, not a saving.
+  budget_underrun_flag_pct: 0.10
+  # Number of periods in a year, by cadence. Sets the prorated budget share and
+  # the factor that annualizes a period's actuals.
+  periods_per_year:
+    quarterly: 4
+    monthly: 12
+    semiannual: 2
+    annual: 1
+  # Utility and heating spend does not arrive in even quarters. These
+  # categories carry a seasonality caveat on the report instead of a numeric
+  # adjustment — Camelot does not invent a seasonal curve it cannot evidence.
+  seasonality_caveat_categories:
+    - gas
+    - electricity
+    - hvac_mechanical
+    - water_sewer
+
+# ---------------------------------------------------------------------------
+# Cross-portfolio comparison — the independent check that runs whether or not
+# the building is on its own budget.
+# ---------------------------------------------------------------------------
+portfolio:
+  # Annualized actuals within this distance of the portfolio average are
+  # reported at market. Savings are never manufactured.
+  at_portfolio_average_threshold_pct: 0.10
+  # Comparable buildings must be within ±this fraction of the subject's units.
+  unit_count_comp_band_pct: 0.5
+  # Below this comp count the target is pulled back toward the building's own
+  # annualized spend, so thin evidence cannot drive a large claim.
+  min_comps_for_confident_target: 3
+  # Categories where scope may never be reduced to save money. Fire/life-safety,
+  # elevator safety, and statutory items may only be rebid at identical scope,
+  # audited for billing errors, or verified against the record.
+  no_scope_reduction_categories:
+    - sprinkler_fire_alarm
+    - elevator_maintenance
+    - taxes_bank_fees
+
+# ---------------------------------------------------------------------------
+# Expense category taxonomy — arbitrary GL labels normalize into these.
+# Extend expense_taxonomy.CATEGORY_KEYWORDS when adding a category here.
+# ---------------------------------------------------------------------------
+categories:
+  - payroll_and_cleaning
+  - insurance
+  - hvac_mechanical
+  - electricity
+  - water_sewer
+  - gas
+  - phone_internet_cable
+  - intercom_security
+  - elevator_maintenance
+  - sprinkler_fire_alarm
+  - exterminator
+  - compactor_waste
+  - misc_repairs
+  - admin_fees
+  - legal_accounting_management
+  - taxes_bank_fees
+
+supabase:
+  reports_table: "perseus_variance_reports"
+  benchmarks_table: "portfolio_benchmarks"
+  # CostBeat Bot's table. Perseus reads it to find a building's already-uploaded
+  # annual budget. Absent (CostBeat not deployed, or no analysis on file for the
+  # property), the staff member uploads the annual budget with the actuals.
+  costbeat_analyses_table: "costbeat_analyses"
+
+llm:
+  # Used only to tighten the recommendation prose after every dollar figure is
+  # already fixed. Never used to produce a figure — those come from the parsed
+  # report, the budget baseline, and portfolio_benchmarks.
+  model: "gpt-4o-mini"
+  enabled: true
+  timeout_seconds: 30
+
+reports_output_dir: "output/perseus"
+log_level: "INFO"

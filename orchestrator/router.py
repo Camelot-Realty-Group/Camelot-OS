@@ -795,6 +795,66 @@ INTENT_PATTERNS: List[IntentPattern] = [
         "concierge", "list_templates",
         lambda t: {"query": t}
     ),
+
+    # -------------------------------------------------------------------
+    # PERSEUS — Periodic management-report variance & per-period proposal
+    #
+    # Sits below CostBeat's 90–99 band on purpose. CostBeat owns forward-
+    # looking budget questions ("review this budget"); Perseus owns
+    # backward-looking actuals ("how did Q2 land"). The discriminator is
+    # tense and the presence of a period, so these patterns all require a
+    # period word, a variance word, or "actual".
+    # -------------------------------------------------------------------
+    (
+        100,
+        [
+            r'(list|show\s+me|pull\s+up)\s+.*(variance|quarterly)\s+report',
+            r'(variance|quarterly)\s+report\s+(list|history)',
+            r'(prior|previous|last)\s+(quarters?|periods?)\s+.*(variance|report)',
+        ],
+        "perseus", "list_period_reports",
+        lambda t: {"query": t}
+    ),
+    (
+        101,
+        [
+            r'(quarterly|monthly|period)\s+variance',
+            r'management\s+report\s+variance',
+            r'variance\s+(report|analysis)\s+for',
+        ],
+        "perseus", "analyze_period_report",
+        lambda t: {"query": t, "address": _extract_address(t)}
+    ),
+    (
+        102,
+        [
+            r'actuals?\s+(vs\.?|versus|against|to)\s+budget',
+            r'budget\s+(vs\.?|versus)\s+actuals?',
+            r'(how|where)\s+(are|did)\s+(we|they|it)\s+.*track\w*\s+(against|vs\.?|to)\s+(the\s+)?budget',
+            r'(are|is)\s+(we|they)\s+(over|under)\s+budget',
+        ],
+        "perseus", "budget_variance",
+        lambda t: {"query": t, "address": _extract_address(t)}
+    ),
+    (
+        103,
+        [
+            r'\bmds\s+(report|statement|export)',
+            r'(upload|analyz|review)\w*\s+(the\s+|this\s+)?(q[1-4]|quarter\w*|monthly)\s+.*(actuals?|report|numbers)',
+            r'(how\s+did|where\s+did)\s+(q[1-4]|the\s+quarter|the\s+month)\s+.*(land|come\s+in|end\s+up)',
+        ],
+        "perseus", "analyze_period_report",
+        lambda t: {"query": t, "address": _extract_address(t)}
+    ),
+    (
+        104,
+        [
+            r'(this|last|the)\s+(quarter|period)\'?s?\s+(savings|fee)\s+(proposal|opportunity)',
+            r'(per[- ]?period|quarterly)\s+fee\s+proposal',
+        ],
+        "perseus", "build_fee_proposal",
+        lambda t: {"query": t}
+    ),
 ]
 
 
@@ -886,6 +946,7 @@ def _compute_confidence(priority: int) -> float:
     Priority 60–69 → index patterns      → 0.85
     Priority 70–79 → deal patterns       → 0.88
     Priority 80–89 → concierge patterns  → 0.87
+    Priority 100–109 → perseus patterns  → 0.90
     """
     if priority <= 5:
         return 0.98
@@ -905,6 +966,8 @@ def _compute_confidence(priority: int) -> float:
         return 0.88
     elif 80 <= priority <= 89:
         return 0.87
+    elif 100 <= priority <= 109:
+        return 0.90
     return 0.75
 
 
@@ -935,6 +998,9 @@ def _suggest_alternatives(text: str) -> List[str]:
     if any(w in text_lower for w in ('tenant', 'unit', 'lease')):
         suggestions.append("Try: 'Create a maintenance ticket for unit [X]'")
         suggestions.append("Try: 'Message tenant in unit [X]'")
+    if any(w in text_lower for w in ('variance', 'actual', 'quarter', 'mds', 'over budget')):
+        suggestions.append("Try: 'How did Q2 land against budget for [address]?'")
+        suggestions.append("Try: 'Run the quarterly variance report on [address]'")
     if any(w in text_lower for w in ('form', 'template', 'document', 'agreement', 'cover sheet')):
         suggestions.append("Try: 'Do we have a form for [situation]?'")
         suggestions.append("Try: 'Download the COI tracking form'")
