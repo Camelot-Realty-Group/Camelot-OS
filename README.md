@@ -2,7 +2,7 @@
 
 **AI-Powered Operating System for Camelot Property Management Services Corp**
 
-Camelot OS is a suite of 8 specialist AI bots controlled by a central orchestrator, replacing fragmented manual workflows with an intelligent, automated platform.
+Camelot OS is a suite of 9 specialist AI bots controlled by a central orchestrator, replacing fragmented manual workflows with an intelligent, automated platform.
 
 ---
 
@@ -16,12 +16,12 @@ Camelot OS is a suite of 8 specialist AI bots controlled by a central orchestrat
      ┌──────────┬──────────────┼──────────────┬──────────┬────────────┐
   SCOUT      BROKER       COMPLIANCE      FRONTDESK   INDEX      CONCIERGE
 Lead Gen   Brokerage      Violations      Residents   Files    Doc Templates
-                    ├──────────────┴──────────────┐
-                  REPORT                        DEAL
-                Analytics                    Roll-Up
+     ┌──────────────┬─────┴────────┬──────────────┐
+                  REPORT         DEAL         COSTBEAT
+                Analytics      Roll-Up     Budget Savings
 ```
 
-## The 8 Bots
+## The 9 Bots
 
 | Bot | Role | Stack |
 |-----|------|-------|
@@ -33,6 +33,7 @@ Lead Gen   Brokerage      Violations      Residents   Files    Doc Templates
 | **Concierge** | Document template catalog, download & auto-fill | Python |
 | **Report** | Owner statements, KPI dashboards, investor updates | Python |
 | **Deal** | Roll-up acquisition outreach pipeline | Python + Node.js |
+| **CostBeat** | Budget savings analysis & fee justification | Python |
 
 ## Quick Start
 
