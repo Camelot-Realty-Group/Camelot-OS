@@ -23,6 +23,8 @@ pyyaml>=6.0.1             # config.yaml parsing
 # ---------------------------------------------------------------------------
 pandas>=2.2.1             # DataFrame support in PDF generator & exports
 numpy>=1.26.4             # pandas dependency
+openpyxl>=3.1.2           # .xlsx budget/report uploads (CostBeat, Perseus)
+pdfplumber>=0.11.0        # PDF budget & MDS table/text extraction (CostBeat, Perseus)
 
 # ---------------------------------------------------------------------------
 # PDF generation
@@ -41,6 +43,7 @@ postgrest>=0.16.1         # Supabase dependency
 fastapi>=0.110.0
 uvicorn>=0.29.0
 httpx>=0.27.0             # orchestrator → bot API calls (api_server.py)
+python-multipart>=0.0.9   # multipart file uploads (CostBeat Bot /analyze, Perseus /analyze)
 
 # ---------------------------------------------------------------------------
 # Document generation (Concierge Bot — merge-tag Word doc auto-fill)

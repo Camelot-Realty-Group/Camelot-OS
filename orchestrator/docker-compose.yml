@@ -10,6 +10,7 @@ version: "3.9"
 #   index_bot       — Document intelligence API (port 8002)
 #   compliance_bot  — NYC regulatory compliance API (port 8003)
 #   concierge_bot   — Document template catalog & auto-fill API (port 8004)
+#   perseus_bot     — Periodic management-report variance engine (port 8006)
 #
 # Usage:
 #   docker-compose up --build               # Start all services
@@ -252,6 +253,36 @@ services:
       <<: *healthcheck-defaults
     labels:
       - "camelot.service=concierge_bot"
+
+  # ---------------------------------------------------------------------------
+  # PERSEUS — Periodic management-report variance engine
+  # ---------------------------------------------------------------------------
+  perseus_bot:
+    build:
+      context: ..
+      dockerfile: perseus_bot/Dockerfile
+    image: camelot-os/perseus-bot:latest
+    container_name: camelot_perseus
+    <<: *common-env
+    environment:
+      - PORT=8006
+      - HOST=0.0.0.0
+      - LOG_FILE=/app/logs/perseus_bot.log
+      - PERSEUS_OUTPUT_DIR=/app/data/perseus
+    ports:
+      - "${PERSEUS_BOT_PORT:-8006}:8006"
+    volumes:
+      - camelot_logs:/app/logs
+      - camelot_data:/app/data
+    networks:
+      camelot_net:
+        ipv4_address: "172.20.0.16"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8006/health"]
+      <<: *healthcheck-defaults
+    labels:
+      - "camelot.service=perseus_bot"
 
   # ---------------------------------------------------------------------------
   # OPTIONAL: Traefik reverse proxy (for production TLS termination)

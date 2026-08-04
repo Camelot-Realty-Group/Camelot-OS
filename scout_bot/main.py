@@ -21,6 +21,15 @@ Usage:
   python main.py --no-enrichment  # Skip enrichment step
   python main.py --no-hubspot     # Skip HubSpot push
   python main.py --no-email       # Skip email send
+  python main.py --serve                # Start API server (default port 8007)
+  python main.py --serve --port 8007     # Lead Hunt / Merlin Inbox HTTP endpoints
+
+API mode (--serve) exposes two additional, independent features used by the
+Supabase pg_cron jobs `camelot-daily-lead-hunt` and `merlin-inbox-poll` (see
+lead_hunt.py and merlin_inbox.py):
+  POST /lead-hunt/run       — NYC Open Data scan -> scored candidates -> scout_buildings
+  POST /merlin/poll-inbox   — poll outreach mailbox for replies -> merlin_inbound_messages
+  GET  /health              — service + dependency configuration status
 """
 
 import argparse
@@ -526,6 +535,125 @@ def run(args: argparse.Namespace) -> int:
 
 
 # ---------------------------------------------------------------------------
+# API server (--serve) — Lead Hunt + Merlin Inbox endpoints
+# ---------------------------------------------------------------------------
+
+def run_api_server(host: str = "0.0.0.0", port: int = 8007) -> None:
+    """
+    Start the Scout Bot FastAPI server.
+
+    This exposes the two features that rebuild the previously-nonfunctional
+    Supabase pg_cron jobs `camelot-daily-lead-hunt` and `merlin-inbox-poll`
+    (both were POSTing to unconfigured `app.settings.*_function_url`
+    values with no endpoint behind them):
+
+        GET  /health              — service + dependency configuration status
+        POST /lead-hunt/run       — run (or return today's already-run) lead hunt
+        POST /merlin/poll-inbox   — poll the outreach mailbox for replies
+
+    It does NOT touch the existing CLI batch pipeline (collectors ->
+    enrichment -> HubSpot -> PDF/CSV -> email) defined above in this file —
+    that keeps working exactly as before via `python main.py`.
+    """
+    try:
+        import uvicorn
+        from fastapi import FastAPI, HTTPException
+        from fastapi.responses import JSONResponse
+    except ImportError:
+        logger.error("FastAPI/uvicorn not installed. Run: pip install -r requirements.txt")
+        sys.exit(1)
+
+    _config = load_config()
+
+    # lead_hunt.py and merlin_inbox.py each resolve utils/audit_log.py
+    # themselves (scout_bot/utils/ shadows the repo-root utils/ package by
+    # name — see the NOTE at the top of each module), so no audit_log
+    # import or sys.path fix-up is needed here.
+    import lead_hunt
+    import merlin_inbox
+    import storage
+
+    app = FastAPI(
+        title="Camelot Scout Bot",
+        version="1.0.0",
+        description=(
+            "Lead generation and property intelligence. Daily NYC Open Data lead "
+            "hunt and outreach-reply inbox polling for Camelot Property Management "
+            "Services Corp."
+        ),
+    )
+
+    def _socrata_configured() -> bool:
+        # Socrata works anonymously; a token only raises the rate limit.
+        return True
+
+    def _merlin_inbox_configured() -> bool:
+        return bool(
+            os.getenv("MERLIN_IMAP_HOST") and os.getenv("MERLIN_IMAP_USER") and os.getenv("MERLIN_IMAP_PASSWORD")
+        )
+
+    @app.get("/health")
+    async def health():
+        return {
+            "status": "ok",
+            "service": "Camelot Scout Bot",
+            "supabase_configured": bool(os.getenv("SUPABASE_URL") and os.getenv("SUPABASE_SERVICE_KEY")),
+            "socrata_app_token_configured": bool(os.getenv("SOCRATA_APP_TOKEN")),
+            "merlin_inbox_configured": _merlin_inbox_configured(),
+            "hubspot_configured": bool(os.getenv("HUBSPOT_ACCESS_TOKEN")),
+        }
+
+    _lh_cfg = _config.get("lead_hunt", {}) or {}
+
+    @app.post("/lead-hunt/run")
+    async def lead_hunt_run(
+        triggered_by: str = "cron",
+        boroughs: Optional[List[str]] = None,
+        recent_days: Optional[int] = None,
+        min_score: Optional[int] = None,
+        dry_run: bool = False,
+    ):
+        """Run the daily lead hunt. Idempotent per calendar day per
+        `triggered_by` — a second call the same day with the same
+        `triggered_by` returns the existing scan rather than re-running.
+
+        Any parameter left unset falls back to the `lead_hunt` section of
+        config.yaml, so cron can POST with no body and still get the
+        configured boroughs/thresholds.
+        """
+        try:
+            result = lead_hunt.run_lead_hunt(
+                triggered_by=triggered_by,
+                boroughs=boroughs if boroughs is not None else _lh_cfg.get("boroughs"),
+                recent_days=recent_days if recent_days is not None else _lh_cfg.get("recent_days", 90),
+                min_score=min_score if min_score is not None else _lh_cfg.get("min_lead_score", 40),
+                dry_run=dry_run,
+            )
+            return JSONResponse(result)
+        except storage.SupabaseUnavailable as exc:
+            raise HTTPException(status_code=503, detail=str(exc))
+        except lead_hunt.LeadHuntError as exc:
+            raise HTTPException(status_code=502, detail=str(exc))
+
+    @app.post("/merlin/poll-inbox")
+    async def merlin_poll_inbox(since: Optional[str] = None, dry_run: bool = False):
+        """Poll the configured outreach mailbox for new replies, match them
+        to scout_buildings / scout_outreach_log, and log them idempotently
+        to merlin_inbound_messages.
+        """
+        try:
+            result = merlin_inbox.poll_inbox(since=since, dry_run=dry_run)
+            return JSONResponse(result)
+        except merlin_inbox.InboxUnavailable as exc:
+            raise HTTPException(status_code=503, detail=str(exc))
+        except storage.SupabaseUnavailable as exc:
+            raise HTTPException(status_code=503, detail=str(exc))
+
+    logger.info("Starting Scout Bot API server on %s:%d", host, port)
+    uvicorn.run(app, host=host, port=port)
+
+
+# ---------------------------------------------------------------------------
 # CLI argument parser
 # ---------------------------------------------------------------------------
 
@@ -564,6 +692,24 @@ def _build_parser() -> argparse.ArgumentParser:
         default=str(CONFIG_PATH),
         help=f"Path to config.yaml (default: {CONFIG_PATH})",
     )
+    parser.add_argument(
+        "--serve",
+        action="store_true",
+        default=False,
+        help="Start the FastAPI server (Lead Hunt + Merlin Inbox endpoints) instead of the CLI batch run.",
+    )
+    parser.add_argument(
+        "--host",
+        type=str,
+        default="0.0.0.0",
+        help="API server host when --serve is used (default: 0.0.0.0)",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=8007,
+        help="API server port when --serve is used (default: 8007)",
+    )
     return parser
 
 
@@ -577,6 +723,10 @@ if __name__ == "__main__":
 
     if args.config != str(CONFIG_PATH):
         CONFIG_PATH = Path(args.config)
+
+    if args.serve:
+        run_api_server(host=args.host, port=args.port)
+        sys.exit(0)
 
     exit_code = run(args)
     sys.exit(exit_code)

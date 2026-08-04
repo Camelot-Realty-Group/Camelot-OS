@@ -4,26 +4,30 @@
 
 Scout Bot runs daily at 7 AM, collecting property-management acquisition targets, RFPs, hiring signals, and unmanaged buildings across New York, New Jersey, Connecticut, and Florida. It enriches the best leads with contact data from Apollo.io and Prospeo, pushes them into HubSpot CRM, and emails a branded PDF + CSV digest to the Camelot team.
 
+Scout Bot also runs a second, independent pipeline via `--serve` mode: a daily NYC Open Data lead hunt and a periodic outreach-mailbox poll ("Merlin Inbox"). See [Two Lead Pipelines](#two-lead-pipelines) below before assuming `scout_leads` is the only table this bot touches.
+
 ---
 
 ## Table of Contents
 
 1. [Architecture Overview](#architecture-overview)
-2. [File Structure](#file-structure)
-3. [Prerequisites](#prerequisites)
-4. [Installation](#installation)
-5. [Environment Variables](#environment-variables)
-6. [Configuration](#configuration)
-7. [Running Scout Bot](#running-scout-bot)
-8. [Supabase Setup](#supabase-setup)
-9. [HubSpot Setup](#hubspot-setup)
-10. [Render Deployment](#render-deployment)
-11. [Cron Scheduling](#cron-scheduling)
-12. [Lead Schema](#lead-schema)
-13. [Collector Reference](#collector-reference)
-14. [Enrichment Pipeline](#enrichment-pipeline)
-15. [Reports & Email](#reports--email)
-16. [Troubleshooting](#troubleshooting)
+2. [Two Lead Pipelines](#two-lead-pipelines)
+3. [File Structure](#file-structure)
+4. [Prerequisites](#prerequisites)
+5. [Installation](#installation)
+6. [Environment Variables](#environment-variables)
+7. [Configuration](#configuration)
+8. [Running Scout Bot](#running-scout-bot)
+9. [API Server (--serve mode)](#api-server---serve-mode)
+10. [Supabase Setup](#supabase-setup)
+11. [HubSpot Setup](#hubspot-setup)
+12. [Render Deployment](#render-deployment)
+13. [Cron Scheduling](#cron-scheduling)
+14. [Lead Schema](#lead-schema)
+15. [Collector Reference](#collector-reference)
+16. [Enrichment Pipeline](#enrichment-pipeline)
+17. [Reports & Email](#reports--email)
+18. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -68,15 +72,38 @@ Scout Bot runs daily at 7 AM, collecting property-management acquisition targets
 
 ---
 
+## Two Lead Pipelines
+
+Scout Bot contains two separate, non-interacting lead pipelines. They share a codebase and a config file but not a table, a trigger, or an output.
+
+| | CLI Batch Pipeline (original) | Lead Hunt + Merlin Inbox (new) |
+|---|---|---|
+| **Trigger** | `python main.py` (cron / GitHub Actions / manual) | `POST /lead-hunt/run` and `POST /merlin/poll-inbox` via `--serve` mode |
+| **Sources** | BizBuySell, BizQuest, LoopNet, job postings, HPD buildings collector | NYC Open Data (HPD, DOB, DOF, LL97) directly |
+| **Storage** | Supabase `scout_leads` (optional — works without Supabase) | Supabase `scout_buildings`, `scout_scans`, `scout_outreach_log`, `merlin_inbound_messages` (**required** — these routes 503 without it) |
+| **Contact enrichment** | Apollo.io + Prospeo | None — HPD registration contacts only |
+| **Downstream** | HubSpot CRM push + PDF/CSV email digest | Direct-to-Supabase; no HubSpot, no email digest (yet) |
+| **Reply handling** | None | Merlin Inbox polls a mailbox and matches replies back to `scout_outreach_log` |
+| **Was this pipeline live before this repo's `feature/merlin-leadhunt` branch?** | Yes, in production | No — rebuilding two pg_cron jobs (`camelot-daily-lead-hunt`, `merlin-inbox-poll`) that pointed at endpoints that never existed |
+
+If you are debugging "why didn't my lead show up in HubSpot," you are almost certainly looking at the wrong pipeline if the lead came from the new Supabase tables above — Lead Hunt leads never touch HubSpot.
+
+---
+
 ## File Structure
 
 ```
 scout_bot/
-├── main.py                          # Master orchestrator
+├── main.py                          # Master orchestrator + --serve mode (FastAPI: /health, /lead-hunt/run, /merlin/poll-inbox)
 ├── config.yaml                      # Central configuration
 ├── requirements.txt                 # Python dependencies
 ├── package.json                     # Node.js dependencies
 ├── .env.example                     # Environment variable template
+├── skill_definition.md              # Role, data sources, scoring/matching rules, operating rules
+├── storage.py                       # SupabaseREST client for scout_buildings/scout_scans/scout_outreach_log/merlin_inbound_messages
+├── scoring.py                       # calculate_score() — ported from camelot-scout-v6's scoring.ts
+├── lead_hunt.py                     # NYC Open Data query + score + upsert (POST /lead-hunt/run)
+├── merlin_inbox.py                  # Inbox poll + reply matching + logging (POST /merlin/poll-inbox)
 │
 ├── collectors/
 │   ├── __init__.py
@@ -184,10 +211,11 @@ nano .env
 | `SMTP_USE_TLS` | No | Enable STARTTLS (default: `true`) |
 | `SMTP_USE_SSL` | No | Use direct SSL (default: `false`) |
 | `SOCRATA_APP_TOKEN` | No | NYC Open Data app token (higher rate limits) |
-| `SUPABASE_URL` | No | Supabase project URL |
-| `SUPABASE_SERVICE_KEY` | No | Supabase service role key |
+| `SUPABASE_URL` | No for CLI pipeline / **Yes for --serve mode** | Supabase project URL |
+| `SUPABASE_SERVICE_KEY` | No for CLI pipeline / **Yes for --serve mode** | Supabase service role key |
+| `MERLIN_IMAP_HOST` / `_PORT` / `_USER` / `_PASSWORD` / `_MAILBOX` | Yes for `/merlin/poll-inbox` | Outreach mailbox IMAP credentials — **provider unconfirmed, see `.env.example` for the full open question** |
 
-\* Required for the respective feature to work. Scout Bot degrades gracefully when optional credentials are missing.
+\* Required for the respective feature to work. Scout Bot degrades gracefully when optional credentials are missing — with one exception: `SUPABASE_URL`/`SUPABASE_SERVICE_KEY` are optional for the original CLI batch pipeline but **required** for the newer `/lead-hunt/run` and `/merlin/poll-inbox` endpoints, which return HTTP 503 without them rather than silently no-op'ing.
 
 ---
 
@@ -209,6 +237,21 @@ hubspot:
   default_stage: "appointmentscheduled"
 log_level: INFO
 cron: "0 7 * * *"                   # 7 AM daily
+
+# --serve mode only (Lead Hunt + Merlin Inbox — separate pipeline, see
+# "Two Lead Pipelines" above):
+lead_hunt:
+  buildings_table: scout_buildings
+  scans_table: scout_scans
+  boroughs: [MANHATTAN, BROOKLYN, QUEENS, BRONX, STATEN ISLAND]
+  recent_days: 90
+  min_lead_score: 40
+  cron_job_name: camelot-daily-lead-hunt   # the paused pg_cron job this endpoint serves
+  cron_schedule: "0 11 * * *"              # UTC (~7 AM Eastern)
+merlin_inbox:
+  provider: imap                           # see .env.example MERLIN_IMAP_* — provider unconfirmed
+  cron_job_name: merlin-inbox-poll         # the paused pg_cron job this endpoint serves
+  cron_schedule: "*/10 * * * *"            # every 10 minutes
 ```
 
 ---
@@ -261,6 +304,54 @@ python collectors/nyc_rfps.py
 python reports/pdf_generator.py
 # Writes test PDFs to /tmp/camelot_*_test.pdf
 ```
+
+---
+
+## API Server (--serve mode)
+
+The CLI batch pipeline above and the API server below are two different entry points into the same `main.py`. `--serve` does not run the collectors/HubSpot/email pipeline; it starts a FastAPI app exposing the Lead Hunt + Merlin Inbox pipeline instead.
+
+```bash
+python main.py --serve                       # binds 0.0.0.0:8007
+python main.py --serve --host 127.0.0.1 --port 8010
+```
+
+### `GET /health`
+
+Returns service status and which dependencies are configured:
+
+```json
+{
+  "status": "ok",
+  "service": "Camelot Scout Bot",
+  "supabase_configured": true,
+  "socrata_app_token_configured": false,
+  "merlin_inbox_configured": true,
+  "hubspot_configured": true
+}
+```
+
+### `POST /lead-hunt/run`
+
+Runs the daily NYC Open Data lead hunt: queries HPD registrations/violations (and related datasets) for the configured boroughs, scores every candidate building (see `scoring.py`), and upserts qualifying ones (score ≥ `min_score`) into Supabase `scout_buildings`, recording the run in `scout_scans`.
+
+Query params (all optional — default from `config.yaml`'s `lead_hunt` section when omitted):
+
+| Param | Type | Default (from config.yaml) |
+|---|---|---|
+| `triggered_by` | string | `"cron"` |
+| `boroughs` | list[string] | `lead_hunt.boroughs` |
+| `recent_days` | int | `lead_hunt.recent_days` (90) |
+| `min_score` | int | `lead_hunt.min_lead_score` (40) |
+| `dry_run` | bool | `false` |
+
+**Idempotent per calendar day per `triggered_by`** — a second call the same day with the same `triggered_by` returns the existing scan's summary instead of re-scanning and re-upserting. Returns HTTP 503 if Supabase is not configured; HTTP 502 on a NYC Open Data failure severe enough to abort the whole run (partial per-borough failures instead just show up in the response's `errors` list and the run still completes).
+
+### `POST /merlin/poll-inbox`
+
+Polls the configured outreach mailbox (see [Environment Variables](#environment-variables) — IMAP only, provider TBD) for messages since `since` (ISO timestamp, defaults to the provider's own "since last successful poll" bookkeeping), matches each one to `scout_outreach_log` by thread id first, then by contact email, classifies its intent, and logs it to `merlin_inbound_messages`.
+
+**Idempotent forever, not just per-day** — keyed on the provider's native message id; a message already logged is never logged twice, however many times or however wide a window this is polled with. Returns HTTP 503 if the mailbox or Supabase is not configured.
 
 ---
 

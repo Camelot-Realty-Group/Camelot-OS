@@ -95,10 +95,57 @@ cron: "0 7 * * *"
 
 # ---------------------------------------------------------------------------
 # Supabase (optional — for persistent lead storage)
+#
+# NOTE: this `supabase.table_name` (scout_leads) is used ONLY by the
+# existing generic collector -> HubSpot batch pipeline in main.py. It is a
+# separate table from the one below.
 # ---------------------------------------------------------------------------
 supabase:
   table_name: scout_leads
   # URL and key are loaded from SUPABASE_URL / SUPABASE_SERVICE_KEY env vars
+
+# ---------------------------------------------------------------------------
+# Lead Hunt + Merlin Inbox (--serve mode: POST /lead-hunt/run, POST /merlin/poll-inbox)
+#
+# Rebuilds the two Supabase pg_cron jobs `camelot-daily-lead-hunt` and
+# `merlin-inbox-poll`, which used to POST to unconfigured
+# app.settings.*_function_url values with no endpoint behind them. This is a
+# SEPARATE pipeline from `supabase.table_name` above: it reads/writes
+# scout_buildings, scout_scans, scout_outreach_log, and
+# merlin_inbound_messages / merlin_outbound_messages directly (the tables
+# used by the camelot-scout-v6 app), not scout_leads.
+# ---------------------------------------------------------------------------
+lead_hunt:
+  buildings_table: scout_buildings
+  scans_table: scout_scans
+  # Boroughs queried against NYC Open Data (HPD registrations/violations, DOF
+  # property records) each run.
+  boroughs:
+    - MANHATTAN
+    - BROOKLYN
+    - QUEENS
+    - BRONX
+    - STATEN ISLAND
+  # Look back this many days for recently (re-)registered HPD buildings.
+  recent_days: 90
+  # Minimum score (0-100, see scoring.py) a candidate must reach to be
+  # upserted into scout_buildings.
+  min_lead_score: 40
+  # Safety cap on records paginated per borough per run.
+  max_records_per_borough: 2000
+  # Supabase pg_cron job this endpoint is intended to serve (see
+  # supabase_schema.sql for the exact ALTER DATABASE / cron.alter_job
+  # statements — NOT applied automatically by this repo).
+  cron_job_name: camelot-daily-lead-hunt
+  cron_schedule: "0 11 * * *"  # UTC; ~7 AM Eastern
+
+merlin_inbox:
+  # Provider behind the InboxProvider interface in merlin_inbox.py. "imap" is
+  # the only implementation shipped so far — see merlin_inbox.py module
+  # docstring for why, and what to confirm before this goes live.
+  provider: imap
+  cron_job_name: merlin-inbox-poll
+  cron_schedule: "*/10 * * * *"  # every 10 minutes
 
 # ---------------------------------------------------------------------------
 # Report output directory
