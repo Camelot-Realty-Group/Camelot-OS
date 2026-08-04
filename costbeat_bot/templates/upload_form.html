@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Camelot OS — CostBeat Bot</title>
+  <style>
+    :root {
+      --navy:       #1A2645;
+      --navy-light: #243055;
+      --navy-dark:  #111B33;
+      --gold:       #C9A84C;
+      --gold-light: #E2C572;
+      --white:      #F4F6FA;
+      --grey:       #8A96B0;
+      --grey-dim:   #4A5568;
+      --green:      #3DD68C;
+      --red:        #E05252;
+      --amber:      #F5A623;
+      --font:       system-ui, -apple-system, 'Segoe UI', sans-serif;
+      --radius:     8px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--navy-dark);
+      color: var(--white);
+      font-family: var(--font);
+      font-size: 14px;
+      line-height: 1.5;
+      padding: 0 0 60px;
+    }
+
+    header {
+      background: var(--navy);
+      border-bottom: 2px solid var(--gold);
+      padding: 22px 28px;
+    }
+
+    header .eyebrow {
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--gold);
+      font-weight: 700;
+    }
+
+    header h1 { font-size: 22px; font-weight: 700; margin-top: 4px; }
+    header p  { color: var(--grey); font-size: 13px; margin-top: 4px; max-width: 760px; }
+
+    main { max-width: 1180px; margin: 0 auto; padding: 26px 20px 0; }
+
+    .card {
+      background: var(--navy);
+      border: 1px solid rgba(201, 168, 76, 0.22);
+      border-radius: var(--radius);
+      padding: 22px;
+      margin-bottom: 22px;
+    }
+
+    .card > h2 {
+      font-size: 12px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--gold);
+      font-weight: 700;
+      border-bottom: 1px solid rgba(201, 168, 76, 0.25);
+      padding-bottom: 8px;
+      margin-bottom: 16px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+      gap: 14px;
+    }
+
+    label {
+      display: block;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--grey);
+      margin-bottom: 5px;
+      font-weight: 600;
+    }
+
+    label .req { color: var(--gold); }
+
+    input, select, textarea {
+      width: 100%;
+      background: var(--navy-dark);
+      border: 1px solid var(--grey-dim);
+      border-radius: 5px;
+      color: var(--white);
+      font-family: var(--font);
+      font-size: 13px;
+      padding: 9px 10px;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: var(--gold);
+    }
+
+    textarea { resize: vertical; min-height: 68px; }
+
+    .full { grid-column: 1 / -1; }
+
+    .hint { font-size: 11px; color: var(--grey-dim); margin-top: 5px; }
+
+    button {
+      background: var(--gold);
+      color: var(--navy-dark);
+      border: none;
+      border-radius: 5px;
+      font-family: var(--font);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 11px 24px;
+      cursor: pointer;
+    }
+
+    button:hover:not(:disabled) { background: var(--gold-light); }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .actions { margin-top: 18px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+
+    a.btn-link {
+      display: inline-block;
+      background: transparent;
+      border: 1px solid var(--gold);
+      color: var(--gold);
+      border-radius: 5px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 10px 20px;
+      text-decoration: none;
+    }
+
+    a.btn-link:hover { background: rgba(201, 168, 76, 0.12); }
+
+    #status { font-size: 13px; color: var(--grey); }
+    #status.error { color: var(--red); }
+
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+
+    th {
+      text-align: left;
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--gold);
+      border-bottom: 1px solid rgba(201, 168, 76, 0.35);
+      padding: 7px 8px;
+      font-weight: 700;
+      vertical-align: bottom;
+    }
+
+    td {
+      border-bottom: 1px solid rgba(138, 150, 176, 0.14);
+      padding: 8px;
+      vertical-align: top;
+    }
+
+    .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .save { color: var(--green); font-weight: 700; }
+    tr.at-market td, tr.not-addressed td { color: var(--grey); }
+    tr.total td { border-top: 2px solid var(--gold); font-weight: 700; color: var(--white); }
+    tr.total td.save { color: var(--green); }
+
+    .tag {
+      display: inline-block;
+      font-size: 9px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 2px 6px;
+      border-radius: 3px;
+      margin-left: 6px;
+      background: rgba(138, 150, 176, 0.2);
+      color: var(--grey);
+      font-weight: 700;
+    }
+
+    .tag.protected { background: rgba(245, 166, 35, 0.18); color: var(--amber); }
+
+    .kpis {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+
+    .kpi {
+      background: var(--navy-light);
+      border-left: 3px solid var(--gold);
+      border-radius: 5px;
+      padding: 12px 14px;
+    }
+
+    .kpi .k {
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--grey);
+      font-weight: 700;
+    }
+
+    .kpi .v { font-size: 21px; font-weight: 700; margin-top: 3px; font-variant-numeric: tabular-nums; }
+    .kpi .v.green { color: var(--green); }
+
+    .options { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+
+    .option {
+      background: var(--navy-light);
+      border: 1px solid var(--grey-dim);
+      border-radius: 6px;
+      padding: 16px;
+    }
+
+    .option.recommended { border-color: var(--gold); border-width: 2px; }
+
+    .option h3 { font-size: 13px; font-weight: 700; color: var(--gold-light); }
+    .option .headline { font-size: 12px; margin: 8px 0 10px; }
+    .option ul { list-style: none; }
+    .option li { font-size: 11.5px; color: var(--grey); padding-left: 14px; position: relative; margin-bottom: 6px; }
+    .option li::before { content: "▪"; color: var(--gold); position: absolute; left: 0; }
+
+    .badge {
+      display: inline-block;
+      background: var(--gold);
+      color: var(--navy-dark);
+      font-size: 9px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 3px;
+      margin-left: 8px;
+    }
+
+    .checklist { list-style: none; }
+    .checklist li { font-size: 12.5px; padding-left: 20px; position: relative; margin-bottom: 7px; }
+    .checklist li::before { content: "☐"; color: var(--gold); position: absolute; left: 0; }
+
+    .note {
+      font-size: 11.5px;
+      color: var(--grey);
+      background: rgba(245, 166, 35, 0.08);
+      border-left: 3px solid var(--amber);
+      padding: 9px 12px;
+      border-radius: 4px;
+      margin-top: 12px;
+    }
+
+    .caveat { font-size: 11px; color: var(--grey-dim); margin-top: 16px; line-height: 1.6; }
+
+    .hidden { display: none; }
+
+    .source-toggle {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid rgba(201, 168, 76, 0.2);
+    }
+
+    .source-option {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--white);
+      text-transform: none;
+      letter-spacing: normal;
+      cursor: pointer;
+    }
+
+    .source-option input { width: auto; }
+
+    .source-option.disabled { color: var(--grey-dim); cursor: not-allowed; }
+
+    footer {
+      text-align: center;
+      color: var(--grey-dim);
+      font-size: 11px;
+      padding: 24px 20px 0;
+      border-top: 1px solid rgba(201, 168, 76, 0.18);
+      max-width: 1180px;
+      margin: 20px auto 0;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="eyebrow">Camelot Property Management Services Corp</div>
+  <h1>CostBeat Bot</h1>
+  <p>
+    Upload a building's operating budget. Every expense line is compared against Camelot's own
+    managed portfolio at a similar unit count, and each line gets a target, an addressable saving,
+    and the specific action that gets there.
+  </p>
+</header>
+
+<main>
+
+  <form class="card" id="form">
+    <h2>Building &amp; Budget</h2>
+
+    <div class="source-toggle" id="source-toggle">
+      <label class="source-option">
+        <input type="radio" name="data_source" value="spire" id="source-spire" />
+        Pull from Spire
+      </label>
+      <label class="source-option">
+        <input type="radio" name="data_source" value="upload" id="source-upload" checked />
+        Upload a file
+      </label>
+      <span class="hint" id="source-note"></span>
+    </div>
+
+    <div class="grid" id="spire-fields">
+      <div class="full">
+        <label for="spire_building_id">Building (from Spire) <span class="req">*</span></label>
+        <select id="spire_building_id" name="spire_building_id">
+          <option value="">Loading buildings…</option>
+        </select>
+        <div class="hint">Property name, address, and unit count auto-fill from the selected building.</div>
+      </div>
+      <div>
+        <label for="spire_year">Budget year <span class="req">*</span></label>
+        <input id="spire_year" name="spire_year" type="number" min="2000" max="2100" placeholder="e.g. 2026" />
+      </div>
+    </div>
+
+    <div class="grid">
+      <div>
+        <label for="property_name">Property name <span class="req">*</span></label>
+        <input id="property_name" name="property_name" placeholder="e.g. 245 East 87th Street" />
+      </div>
+      <div>
+        <label for="unit_count">Unit count <span class="req">*</span></label>
+        <input id="unit_count" name="unit_count" type="number" min="1" placeholder="e.g. 34" />
+        <div class="hint">Used to compare on a per-unit basis.</div>
+      </div>
+      <div>
+        <label for="building_type">Building type</label>
+        <select id="building_type" name="building_type">
+          <option value="">Not specified</option>
+          <option value="condo">Condo</option>
+          <option value="co-op">Co-op</option>
+          <option value="rental">Rental</option>
+          <option value="mixed-use">Mixed-use</option>
+        </select>
+      </div>
+      <div>
+        <label for="market">Market / borough</label>
+        <input id="market" name="market" placeholder="e.g. Manhattan" />
+      </div>
+      <div class="full">
+        <label for="address">Address</label>
+        <input id="address" name="address" placeholder="Street address" />
+      </div>
+      <div class="full" id="upload-field">
+        <label for="budget_file">Operating budget <span class="req">*</span></label>
+        <input id="budget_file" name="budget_file" type="file" accept=".xlsx,.xls,.csv,.pdf" />
+        <div class="hint">.xlsx, .csv, or .pdf. PDF uploads are flagged for figure verification.</div>
+      </div>
+      <div class="full">
+        <label for="notes">Notes</label>
+        <textarea id="notes" name="notes" placeholder="Context for the file — fiscal year, whether figures are budget or actuals, anything unusual."></textarea>
+      </div>
+    </div>
+    <div class="actions">
+      <button type="submit" id="submit">Run cost-beat analysis</button>
+      <span id="status"></span>
+    </div>
+  </form>
+
+  <section class="card hidden" id="results">
+    <h2>Results</h2>
+    <div class="kpis" id="kpis"></div>
+
+    <div style="overflow-x:auto">
+      <table id="lines">
+        <thead>
+          <tr>
+            <th>Line item</th>
+            <th class="num">Their budget</th>
+            <th>Camelot comparable evidence</th>
+            <th class="num">Target (est.)</th>
+            <th class="num">Est. annual savings</th>
+            <th class="num">%</th>
+            <th>How we get there</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div id="disclosure"></div>
+
+    <h2 style="margin-top:26px">Savings-Capture Fee Proposal</h2>
+    <p id="rationale" style="font-size:12.5px;margin-bottom:14px"></p>
+    <div class="options" id="options"></div>
+
+    <h2 style="margin-top:26px">Follow-Up / Next Steps</h2>
+    <ul class="checklist" id="next-steps"></ul>
+
+    <div class="actions">
+      <a class="btn-link hidden" id="pdf" href="#" target="_blank" rel="noopener">Download PDF</a>
+    </div>
+
+    <p class="caveat">
+      Targets are good-faith estimates, not quotes; final numbers follow vendor bids and records
+      review. Lines shown at 0% are already at market and no change is recommended. Fire and
+      life-safety, elevator safety, and statutory scope are never reduced — those lines may only be
+      rebid at identical scope or audited for billing accuracy.
+    </p>
+  </section>
+
+  <section class="card">
+    <h2>Recent Analyses</h2>
+    <div style="overflow-x:auto">
+      <table id="history">
+        <thead>
+          <tr>
+            <th>Property</th>
+            <th class="num">Units</th>
+            <th class="num">Budget</th>
+            <th class="num">Addressable savings</th>
+            <th class="num">%</th>
+            <th>Recommended fee</th>
+            <th>Status</th>
+            <th>Report</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+</main>
+
+<footer>Camelot OS · CostBeat Bot</footer>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const money = (n) => '$' + Math.round(Number(n) || 0).toLocaleString('en-US');
+const pct = (n, digits) => ((Number(n) || 0) * 100).toFixed(digits === undefined ? 0 : digits) + '%';
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g,
+  (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+const FEE_LABELS = {
+  one_time_fee: 'One-time cost-recovery fee',
+  mgmt_fee_uplift: 'Management-fee uplift',
+};
+
+// ---------------------------------------------------------------------------
+// Data source toggle: "Pull from Spire" vs "Upload a file"
+// ---------------------------------------------------------------------------
+let spireBuildings = [];
+
+function currentSource() {
+  return document.querySelector('input[name="data_source"]:checked').value;
+}
+
+function applySourceVisibility() {
+  const source = currentSource();
+  const isSpire = source === 'spire';
+  $('spire-fields').classList.toggle('hidden', !isSpire);
+  $('upload-field').classList.toggle('hidden', isSpire);
+  $('budget_file').required = !isSpire;
+  $('spire_building_id').required = isSpire;
+  $('spire_year').required = isSpire;
+  // Manual fields stay required either way, but when pulling from Spire
+  // they're auto-filled from the selected building so relax the constraint
+  // until a building is actually chosen.
+  $('property_name').required = !isSpire;
+  $('unit_count').required = !isSpire;
+}
+
+async function loadSpireBuildings() {
+  const toggle = $('source-toggle');
+  const spireRadio = $('source-spire');
+  const spireLabel = spireRadio.closest('.source-option');
+  const note = $('source-note');
+  const select = $('spire_building_id');
+
+  try {
+    const response = await fetch('/spire/buildings');
+    const payload = await response.json();
+
+    if (!payload.configured) {
+      spireRadio.disabled = true;
+      spireLabel.classList.add('disabled');
+      note.textContent = 'Spire is not configured on this server — using file upload.';
+      $('source-upload').checked = true;
+      applySourceVisibility();
+      return;
+    }
+
+    spireBuildings = payload.buildings || [];
+    if (!spireBuildings.length) {
+      spireRadio.disabled = true;
+      spireLabel.classList.add('disabled');
+      note.textContent = 'Spire is configured but no buildings could be loaded — using file upload.';
+      $('source-upload').checked = true;
+      applySourceVisibility();
+      return;
+    }
+
+    select.innerHTML = '<option value="">Select a building\u2026</option>' + spireBuildings.map((b) =>
+      `<option value="${esc(b.building_id)}">${esc(b.name)}${b.address ? ' — ' + esc(b.address) : ''}</option>`
+    ).join('');
+
+    // Default to Spire mode when it's configured and buildings are available.
+    spireRadio.checked = true;
+    note.textContent = `${spireBuildings.length} building(s) available from Spire.`;
+    applySourceVisibility();
+  } catch (error) {
+    spireRadio.disabled = true;
+    spireLabel.classList.add('disabled');
+    note.textContent = 'Could not reach Spire — using file upload.';
+    $('source-upload').checked = true;
+    applySourceVisibility();
+  }
+}
+
+document.querySelectorAll('input[name="data_source"]').forEach((el) =>
+  el.addEventListener('change', applySourceVisibility)
+);
+
+$('spire_building_id').addEventListener('change', (event) => {
+  const building = spireBuildings.find((b) => String(b.building_id) === event.target.value);
+  if (!building) return;
+  $('property_name').value = building.name || '';
+  $('address').value = building.address || '';
+  if (building.unit_count) $('unit_count').value = building.unit_count;
+});
+
+applySourceVisibility();
+loadSpireBuildings();
+
+$('form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const status = $('status');
+  status.className = '';
+  status.textContent = 'Sourcing the budget and pulling comparables…';
+  $('submit').disabled = true;
+
+  try {
+    const formData = new FormData($('form'));
+    // Don't send an empty file field when pulling from Spire.
+    if (currentSource() === 'spire') {
+      formData.delete('budget_file');
+    }
+    const response = await fetch('/analyze', {
+      method: 'POST',
+      body: formData,
+    });
+    const payload = await response.json();
+    if (!response.ok) {
+      throw new Error(payload.detail || 'Analysis failed.');
+    }
+    render(payload);
+    status.textContent = 'Analysis complete.';
+    loadHistory();
+    $('results').scrollIntoView({ behavior: 'smooth' });
+  } catch (error) {
+    status.className = 'error';
+    status.textContent = error.message;
+  } finally {
+    $('submit').disabled = false;
+  }
+});
+
+function render(payload) {
+  const analysis = payload.analysis;
+  const proposal = payload.fee_proposal;
+  $('results').classList.remove('hidden');
+
+  const perUnit = analysis.unit_count
+    ? money(analysis.total_savings / analysis.unit_count) + ' / unit / yr'
+    : 'unit count not supplied';
+
+  $('kpis').innerHTML = [
+    ['Total budget', money(analysis.total_budget), ''],
+    ['Camelot target', money(analysis.total_target), ''],
+    ['Addressable savings', money(analysis.total_savings), 'green'],
+    ['Share of total spend', pct(analysis.savings_pct, 1), ''],
+    ['Per unit', perUnit, ''],
+  ].map(([k, v, cls]) =>
+    `<div class="kpi"><div class="k">${esc(k)}</div><div class="v ${cls}">${esc(v)}</div></div>`
+  ).join('');
+
+  const lines = analysis.line_items || [];
+  const ordered = [
+    ...lines.filter((l) => l.addressed && !l.at_market),
+    ...lines.filter((l) => l.addressed && l.at_market),
+    ...lines.filter((l) => !l.addressed),
+  ];
+
+  const body = ordered.map((line) => {
+    const cls = !line.addressed ? 'not-addressed' : (line.at_market ? 'at-market' : '');
+    const tag = !line.addressed
+      ? '<span class="tag">Not addressed</span>'
+      : (line.at_market ? '<span class="tag">At market</span>' : '');
+    const protectedTag = line.scope_protected
+      ? '<span class="tag protected">Scope protected</span>' : '';
+    const savings = line.savings > 0 ? `<span class="save">${money(line.savings)}</span>` : '—';
+    return `<tr class="${cls}">
+      <td>${esc(line.label)}${tag}${protectedTag}</td>
+      <td class="num">${money(line.current_budget)}</td>
+      <td>${esc(line.evidence)}</td>
+      <td class="num">${money(line.target)}</td>
+      <td class="num">${savings}</td>
+      <td class="num">${line.savings > 0 ? pct(line.savings_pct) : '0%'}</td>
+      <td>${esc(line.recommendation)}</td>
+    </tr>`;
+  }).join('');
+
+  $('lines').querySelector('tbody').innerHTML = body + `<tr class="total">
+      <td>TOTAL</td>
+      <td class="num">${money(analysis.total_budget)}</td>
+      <td>${analysis.benchmark_coverage} categor${analysis.benchmark_coverage === 1 ? 'y' : 'ies'} with Camelot comparables</td>
+      <td class="num">${money(analysis.total_target)}</td>
+      <td class="num save">${money(analysis.total_savings)}</td>
+      <td class="num">${pct(analysis.savings_pct, 1)}</td>
+      <td></td>
+    </tr>`;
+
+  const notes = [];
+  const notAddressed = (analysis.not_addressed || []);
+  if (notAddressed.length) {
+    const total = notAddressed.reduce((sum, l) => sum + Number(l.current_budget || 0), 0);
+    notes.push(`<b>Not addressed:</b> ${money(total)} across ${notAddressed.length} line`
+      + `${notAddressed.length === 1 ? '' : 's'} (${notAddressed.map((l) => esc(l.label)).join(', ')}) `
+      + 'has no comparable Camelot building on file at this size. Excluded from the savings total.');
+  }
+  (analysis.parse_warnings || []).forEach((w) => notes.push(`<b>Parse note:</b> ${esc(w)}`));
+  if (analysis.needs_review) {
+    notes.push('<b>Needs review:</b> confirm the parsed figures against the source file before presenting.');
+  }
+  $('disclosure').innerHTML = notes.map((n) => `<div class="note">${n}</div>`).join('');
+
+  $('rationale').textContent = proposal.rationale;
+  $('options').innerHTML = ['one_time_fee', 'mgmt_fee_uplift'].map((model) => {
+    const option = proposal.options[model];
+    const isRecommended = proposal.recommended_model === model;
+    const label = model === 'one_time_fee'
+      ? `Option A — One-Time Cost-Recovery Fee (${pct(option.camelot_share_pct)} of Year-1 savings)`
+      : `Option B — Management-Fee Uplift (${pct(option.camelot_share_pct)} of annual savings)`;
+    return `<div class="option ${isRecommended ? 'recommended' : ''}">
+      <h3>${esc(label)}${isRecommended ? '<span class="badge">Recommended</span>' : ''}</h3>
+      <div class="headline">${esc(option.headline)}</div>
+      <ul>${option.talking_points.map((p) => `<li>${esc(p)}</li>`).join('')}</ul>
+    </div>`;
+  }).join('');
+
+  $('next-steps').innerHTML = (payload.next_steps || [])
+    .map((step) => `<li>${esc(step)}</li>`).join('');
+
+  const pdf = $('pdf');
+  if (payload.report_url) {
+    pdf.href = payload.report_url;
+    pdf.classList.remove('hidden');
+  } else {
+    pdf.classList.add('hidden');
+  }
+}
+
+async function loadHistory() {
+  const tbody = $('history').querySelector('tbody');
+  try {
+    const response = await fetch('/analyses?limit=25');
+    if (!response.ok) throw new Error('unavailable');
+    const rows = (await response.json()).analyses || [];
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="8">No analyses stored yet.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = rows.map((row) => `<tr>
+      <td>${esc(row.property_name)}</td>
+      <td class="num">${esc(row.unit_count ?? '')}</td>
+      <td class="num">${money(row.total_budget)}</td>
+      <td class="num save">${money(row.total_savings)}</td>
+      <td class="num">${pct(row.savings_pct, 1)}</td>
+      <td>${esc(FEE_LABELS[row.recommended_fee_model] || row.recommended_fee_model || '')}</td>
+      <td>${esc(row.status || '')}</td>
+      <td><a class="btn-link" style="padding:4px 10px;font-size:10px"
+             href="/analyses/${encodeURIComponent(row.id)}/report.pdf"
+             target="_blank" rel="noopener">PDF</a></td>
+    </tr>`).join('');
+  } catch (error) {
+    tbody.innerHTML = '<tr><td colspan="8">Stored analyses are unavailable — check the Supabase connection.</td></tr>';
+  }
+}
+
+loadHistory();
+</script>
+
+</body>
+</html>

@@ -1,9 +1,10 @@
 # =============================================================================
 # Camelot OS — Render Blueprint
 #
-# Deploys the two web-facing services:
+# Deploys the three web-facing services:
 #   camelot-os-orchestrator — master router + dashboard (FastAPI, port from $PORT)
 #   camelot-os-concierge    — document template catalog & auto-fill API
+#   camelot-os-costbeat     — operating-budget cost-beat analysis & fee proposal
 #
 # The other bots (Scout, Broker, Report, Deal, Compliance, Front Desk, Index)
 # run as local subprocesses / cron jobs or via docker-compose on a VM — they
@@ -61,6 +62,29 @@ services:
         value: "3.11"
       - key: LOG_LEVEL
         value: INFO
+
+  - type: web
+    name: camelot-os-costbeat
+    runtime: python
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: python costbeat_bot/main.py --serve --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11"
+      - key: LOG_LEVEL
+        value: INFO
+      # Required — the analysis is built entirely from portfolio_benchmarks.
+      # Run costbeat_bot/supabase_schema.sql in the Supabase SQL editor first.
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      # Optional — prose polish only. Without it the deterministic
+      # per-category mechanism text is used.
+      - key: OPENAI_API_KEY
+        sync: false
 
   # ---------------------------------------------------------------------------
   # OPTIONAL: daily Scout Bot run (uncomment to enable)
