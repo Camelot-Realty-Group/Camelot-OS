@@ -2,11 +2,11 @@
 import bot_registry
 
 
-def test_eight_bots_registered():
-    assert len(bot_registry.BOTS) == 8
+def test_ten_bots_registered():
+    assert len(bot_registry.BOTS) == 10
     assert set(bot_registry.BOTS) == {
         "scout", "broker", "compliance", "frontdesk",
-        "index", "concierge", "report", "deal",
+        "index", "concierge", "report", "deal", "costbeat", "perseus",
     }
 
 
@@ -18,6 +18,22 @@ def test_no_stale_concierge_tenant_ops():
     frontdesk = bot_registry.get_bot("frontdesk")
     assert "tenant" in frontdesk["description"].lower()
     assert frontdesk["entry_point"] == "frontdesk_bot/main.py"
+
+
+def test_costbeat_is_the_budget_savings_bot():
+    costbeat = bot_registry.get_bot("costbeat")
+    assert costbeat["entry_point"] == "costbeat_bot/main.py"
+    assert costbeat["api_port"] == 8005
+    assert "analyze_budget" in costbeat["capabilities"]
+    assert "cost-beat" in costbeat["description"].lower() or "budget" in costbeat["description"].lower()
+
+
+def test_perseus_is_the_periodic_variance_bot():
+    perseus = bot_registry.get_bot("perseus")
+    assert perseus["entry_point"] == "perseus_bot/main.py"
+    assert perseus["api_port"] == 8006
+    assert "analyze_period_report" in perseus["capabilities"]
+    assert "variance" in perseus["description"].lower()
 
 
 def test_api_endpoints_unique_ports():
@@ -39,6 +55,6 @@ def test_validate_action():
 
 def test_summary_shape():
     summary = bot_registry.get_bot_summary()
-    assert len(summary) == 8
+    assert len(summary) == 10
     for item in summary:
         assert {"id", "name", "description", "capabilities", "icon"} <= set(item)

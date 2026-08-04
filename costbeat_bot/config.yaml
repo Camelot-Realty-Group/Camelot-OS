@@ -1,0 +1,84 @@
+# costbeat_bot/config.yaml
+# Camelot Property Management Services Corp — CostBeat Bot Configuration
+
+bot:
+  name: "CostBeat Bot"
+  version: "1.0.0"
+  environment: "production"
+
+camelot:
+  company_name: "Camelot Property Management Services Corp"
+  analysis_email: "ops@camelot.nyc"
+
+server:
+  host: "0.0.0.0"
+  port: 8005
+
+# ---------------------------------------------------------------------------
+# Savings-capture fee proposal defaults
+# ---------------------------------------------------------------------------
+fees:
+  # One-time cost-recovery fee: share of Year-1 implemented savings.
+  one_time_fee_pct_of_year1_savings: 0.33
+  # Management-fee uplift: share of ongoing annual savings, converted into a
+  # permanent addition to the monthly management fee.
+  mgmt_fee_uplift_pct_of_annual_savings: 0.15
+
+# ---------------------------------------------------------------------------
+# Benchmark / analysis thresholds
+# ---------------------------------------------------------------------------
+analysis:
+  # Within this distance of the comp benchmark, a line is "at market".
+  at_market_threshold_pct: 0.05
+  # Comparable buildings must be within ±this fraction of the subject's units.
+  unit_count_comp_band_pct: 0.5
+  # Minimum comps before a target is treated as well-supported. Below this,
+  # the target is pulled toward the subject's own spend (conservative).
+  min_comps_for_confident_target: 3
+  # Where the target sits in the comp range: 0.0 = cheapest comp,
+  # 1.0 = most expensive comp. Deliberately high end of the range.
+  target_percentile_of_comp_range: 0.65
+
+  # Categories where scope may never be reduced to save money. Fire/life-safety,
+  # elevator safety, and statutory items may only be rebid at identical scope,
+  # audited for billing errors, or verified against the record.
+  no_scope_reduction_categories:
+    - sprinkler_fire_alarm
+    - elevator_maintenance
+    - taxes_bank_fees
+
+# ---------------------------------------------------------------------------
+# Expense category taxonomy — arbitrary GL labels normalize into these.
+# Extend benchmarks.CATEGORY_KEYWORDS when adding a category here.
+# ---------------------------------------------------------------------------
+categories:
+  - payroll_and_cleaning
+  - insurance
+  - hvac_mechanical
+  - electricity
+  - water_sewer
+  - gas
+  - phone_internet_cable
+  - intercom_security
+  - elevator_maintenance
+  - sprinkler_fire_alarm
+  - exterminator
+  - compactor_waste
+  - misc_repairs
+  - admin_fees
+  - legal_accounting_management
+  - taxes_bank_fees
+
+supabase:
+  analyses_table: "costbeat_analyses"
+  benchmarks_table: "portfolio_benchmarks"
+
+llm:
+  # Used only to draft the "How We Get There" prose. Never used to produce
+  # dollar figures — those are computed from benchmark data.
+  model: "gpt-4o-mini"
+  enabled: true
+  timeout_seconds: 30
+
+reports_output_dir: "output/costbeat"
+log_level: "INFO"
