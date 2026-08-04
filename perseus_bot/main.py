@@ -18,7 +18,9 @@ import argparse
 import logging
 import os
 import sys
+import time
 from pathlib import Path
+from typing import Any
 
 BOT_DIR = Path(__file__).parent.resolve()
 REPO_ROOT = BOT_DIR.parent
@@ -77,7 +79,7 @@ def run_api_server(host: str = "0.0.0.0", port: int = 8006) -> None:
         sys.exit(1)
 
     from perseus_bot import benchmarks as benchmarks_module
-    from perseus_bot import fee_engine, parser, report_generator, storage, variance_engine
+    from perseus_bot import fee_engine, parser, report_generator, spire_adapter, storage, variance_engine
 
     try:
         from utils.audit_log import audit_event
@@ -85,6 +87,37 @@ def run_api_server(host: str = "0.0.0.0", port: int = 8006) -> None:
         def audit_event(**kwargs):  # degrade gracefully outside the repo layout
             logger.info("AUDIT (fallback): %s", kwargs)
             return kwargs
+
+    try:
+        from utils.spire_client import (
+            SpireAPIError,
+            SpireClient,
+            SpireNotConfigured,
+            is_configured as spire_is_configured,
+            line_items_to_dicts,
+        )
+    except ImportError:
+        # utils/spire_client.py ships on this branch; this fallback only
+        # protects against an unexpected layout change breaking the whole bot.
+        logger.warning("utils.spire_client not importable — Spire sourcing disabled.")
+        SpireClient = None  # type: ignore[assignment]
+
+        class SpireNotConfigured(Exception):
+            pass
+
+        class SpireAPIError(Exception):
+            pass
+
+        def spire_is_configured() -> bool:
+            return False
+
+        def line_items_to_dicts(items):
+            return []
+
+    # In-memory cache for the buildings dropdown — ~10 minutes, so the upload
+    # form doesn't hammer Spire on every page load.
+    _SPIRE_BUILDINGS_CACHE_SECONDS = 600
+    _spire_buildings_cache: dict[str, Any] = {"buildings": None, "fetched_at": 0.0, "error": ""}
 
     cfg = load_config()
     reports_table = cfg["supabase"]["reports_table"]
@@ -226,6 +259,68 @@ def run_api_server(host: str = "0.0.0.0", port: int = 8006) -> None:
             analysis, proposal, reports_output_dir(), report_id=report_id
         )
 
+    def _get_spire_buildings(force: bool = False) -> tuple[list[dict], str]:
+        """
+        Return (buildings, error) from Spire's building list, cached in memory
+        for _SPIRE_BUILDINGS_CACHE_SECONDS so the upload form's dropdown does
+        not call Spire on every page load. `error` is a human-readable reason
+        the cache is empty (not configured, or the call failed) so the UI can
+        show it instead of silently rendering no options.
+        """
+        now = time.monotonic()
+        cached = _spire_buildings_cache["buildings"]
+        fresh = (now - _spire_buildings_cache["fetched_at"]) < _SPIRE_BUILDINGS_CACHE_SECONDS
+        if cached is not None and fresh and not force:
+            return cached, _spire_buildings_cache["error"]
+
+        if not spire_is_configured():
+            _spire_buildings_cache.update(buildings=[], fetched_at=now, error="not_configured")
+            return [], "not_configured"
+
+        try:
+            client = SpireClient()
+            buildings = [b.as_dict() for b in client.list_buildings()]
+            _spire_buildings_cache.update(buildings=buildings, fetched_at=now, error="")
+            return buildings, ""
+        except SpireNotConfigured:
+            _spire_buildings_cache.update(buildings=[], fetched_at=now, error="not_configured")
+            return [], "not_configured"
+        except SpireAPIError as exc:
+            logger.warning("Spire list_buildings failed: %s", exc)
+            _spire_buildings_cache.update(buildings=[], fetched_at=now, error=str(exc))
+            return [], str(exc)
+
+    def _spire_actuals_report(building_id: str, period_start: str, period_end: str, building_name: str):
+        """
+        Pull a period's GL actuals for `building_id` from Spire and adapt them
+        into the same ParsedReport shape the file parsers produce, so the rest
+        of the pipeline is unchanged. Raises SpireNotConfigured / SpireAPIError
+        / parser.ReportParseError on failure — callers turn those into a 400/503
+        rather than silently falling back, since the caller explicitly chose
+        Spire as the source for this request.
+        """
+        client = SpireClient()
+        items = line_items_to_dicts(client.get_gl_actuals(building_id, period_start, period_end))
+        report = spire_adapter.actuals_from_spire(items, building_name=building_name)
+        if not report.lines:
+            raise parser.ReportParseError(
+                f"Spire returned no GL activity for this building between "
+                f"{period_start} and {period_end}."
+            )
+        report.reconcile()
+        return report
+
+    def _spire_budget_report(building_id: str, year: int, building_name: str):
+        """Pull an annual budget for `building_id` from Spire, adapted the same way."""
+        client = SpireClient()
+        items = line_items_to_dicts(client.get_budget(building_id, year))
+        report = spire_adapter.budget_from_spire(items, building_name=building_name, year=year)
+        if not report.lines:
+            raise parser.ReportParseError(
+                f"Spire returned no {year} budget line items for this building."
+            )
+        return report
+
     # ── Routes ────────────────────────────────────────────────────────────
 
     @app.get("/health")
@@ -237,6 +332,7 @@ def run_api_server(host: str = "0.0.0.0", port: int = 8006) -> None:
                 os.getenv("SUPABASE_URL") and os.getenv("SUPABASE_SERVICE_KEY")
             ),
             "llm_configured": bool(os.getenv("OPENAI_API_KEY")),
+            "spire_configured": spire_is_configured(),
         }
 
     @app.get("/", response_class=HTMLResponse)
@@ -248,11 +344,24 @@ def run_api_server(host: str = "0.0.0.0", port: int = 8006) -> None:
             )
         return HTMLResponse(page.read_text(encoding="utf-8"))
 
+    @app.get("/spire/buildings")
+    async def spire_buildings(refresh: bool = False):
+        """
+        Proxy to SpireClient.list_buildings(), cached ~10 minutes, for the
+        upload form's "Pull from Spire" building dropdown. Returns an empty
+        list with `configured: false` rather than an error when Spire has no
+        credentials set, so the UI can disable that option and fall back to
+        manual upload without surfacing a scary failure.
+        """
+        buildings, error = _get_spire_buildings(force=refresh)
+        return {
+            "configured": spire_is_configured(),
+            "buildings": buildings,
+            "error": error,
+        }
+
     @app.post("/analyze")
     async def analyze_period(
-        actual_file: UploadFile = File(
-            ..., description="Period actuals or MDS report (.xlsx, .csv, .pdf)"
-        ),
         property_name: str = Form(...),
         address: str = Form(""),
         quarter: str = Form("Q1"),
@@ -263,8 +372,27 @@ def run_api_server(host: str = "0.0.0.0", port: int = 8006) -> None:
         market: str = Form(""),
         notes: str = Form(""),
         created_by: str = Form("api"),
+        actual_file: UploadFile = File(
+            None, description="Period actuals or MDS report (.xlsx, .csv, .pdf). "
+            "Required unless data_source=spire."
+        ),
         budget_file: UploadFile = File(
             None, description="Optional annual budget, used when none is on file"
+        ),
+        data_source: str = Form(
+            "upload", description="'upload' (default) or 'spire' to pull actuals directly from Spire"
+        ),
+        spire_building_id: str = Form(
+            "", description="Spire CompanyRcd for the selected building (data_source=spire)"
+        ),
+        period_start: str = Form(
+            "", description="ISO date, period start (data_source=spire actuals pull)"
+        ),
+        period_end: str = Form(
+            "", description="ISO date, period end (data_source=spire actuals pull)"
+        ),
+        use_spire_budget: bool = Form(
+            False, description="Source the budget baseline from Spire's GL/Budgets instead of a file/CostBeat"
         ),
     ):
         """Run the full pipeline: parse → baseline → benchmark → compare → price → persist → render."""
@@ -285,13 +413,46 @@ def run_api_server(host: str = "0.0.0.0", port: int = 8006) -> None:
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-        content = await actual_file.read()
-        try:
-            parsed = parser.parse_report(content, actual_file.filename or "actuals")
-        except parser.ReportParseError as exc:
-            audit_event(bot="perseus", action="analyze_period", outcome="error",
-                        detail={"property_name": property_name, "reason": "parse_failed"})
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        data_source = (data_source or "upload").strip().lower()
+        if data_source not in ("upload", "spire"):
+            raise HTTPException(status_code=400, detail="data_source must be 'upload' or 'spire'.")
+
+        uploaded_filename = ""
+        if data_source == "spire":
+            if not spire_building_id:
+                raise HTTPException(
+                    status_code=400, detail="spire_building_id is required when data_source=spire."
+                )
+            if not period_start or not period_end:
+                raise HTTPException(
+                    status_code=400,
+                    detail="period_start and period_end are required when data_source=spire.",
+                )
+            try:
+                parsed = _spire_actuals_report(
+                    spire_building_id, period_start, period_end, property_name
+                )
+            except SpireNotConfigured as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+            except (SpireAPIError, parser.ReportParseError) as exc:
+                audit_event(bot="perseus", action="analyze_period", outcome="error",
+                            detail={"property_name": property_name, "reason": "spire_actuals_failed"})
+                raise HTTPException(status_code=502, detail=f"Spire actuals pull failed: {exc}") from exc
+            uploaded_filename = parsed.filename
+        else:
+            if actual_file is None or not actual_file.filename:
+                raise HTTPException(
+                    status_code=400,
+                    detail="actual_file is required when data_source=upload.",
+                )
+            content = await actual_file.read()
+            try:
+                parsed = parser.parse_report(content, actual_file.filename or "actuals")
+            except parser.ReportParseError as exc:
+                audit_event(bot="perseus", action="analyze_period", outcome="error",
+                            detail={"property_name": property_name, "reason": "parse_failed"})
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+            uploaded_filename = actual_file.filename
 
         budget_content = b""
         budget_filename = ""
@@ -299,10 +460,30 @@ def run_api_server(host: str = "0.0.0.0", port: int = 8006) -> None:
             budget_content = await budget_file.read()
             budget_filename = budget_file.filename
 
+        spire_budget_report = None
+        if use_spire_budget:
+            if not spire_building_id:
+                raise HTTPException(
+                    status_code=400,
+                    detail="spire_building_id is required when use_spire_budget is set.",
+                )
+            try:
+                spire_budget_report = _spire_budget_report(spire_building_id, year, property_name)
+            except SpireNotConfigured as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+            except (SpireAPIError, parser.ReportParseError) as exc:
+                raise HTTPException(
+                    status_code=502, detail=f"Spire budget pull failed: {exc}"
+                ) from exc
+
         try:
-            baseline, costbeat_units = _resolve_baseline(
-                parsed, budget_content, budget_filename, property_name, address, cadence
-            )
+            if spire_budget_report is not None:
+                baseline = variance_engine.baseline_from_spire_budget(spire_budget_report, cadence)
+                costbeat_units = 0
+            else:
+                baseline, costbeat_units = _resolve_baseline(
+                    parsed, budget_content, budget_filename, property_name, address, cadence
+                )
         except variance_engine.MissingBaselineError as exc:
             audit_event(bot="perseus", action="analyze_period", outcome="error",
                         detail={"property_name": property_name, "reason": "no_baseline"})
@@ -352,7 +533,9 @@ def run_api_server(host: str = "0.0.0.0", port: int = 8006) -> None:
             "market": market,
             "budget_source": baseline.source,
             "linked_costbeat_analysis_id": baseline.costbeat_analysis_id,
-            "uploaded_filename": actual_file.filename,
+            "uploaded_filename": uploaded_filename,
+            "data_source": data_source,
+            "spire_building_id": spire_building_id or None,
             "source_format": parsed.source_format,
             "total_budget_period": round(analysis.total_budget_period, 2),
             "total_actual_period": round(analysis.total_actual_period, 2),
@@ -390,7 +573,8 @@ def run_api_server(host: str = "0.0.0.0", port: int = 8006) -> None:
                 "property_name": property_name,
                 "period": analysis.period_label,
                 "unit_count": units,
-                "uploaded_filename": actual_file.filename,
+                "uploaded_filename": uploaded_filename,
+                "data_source": data_source,
                 "budget_source": baseline.source,
                 "budget_variance": round(analysis.budget_variance, 2),
                 "portfolio_savings_annual": round(analysis.portfolio_savings_annual, 2),

@@ -69,6 +69,7 @@ FLAG_NO_BASELINE = "no_baseline"
 BUDGET_SOURCE_COSTBEAT = "costbeat_analysis"
 BUDGET_SOURCE_UPLOADED = "uploaded"
 BUDGET_SOURCE_REPORT_COLUMN = "report_column"
+BUDGET_SOURCE_SPIRE = "spire"
 
 
 class MissingBaselineError(Exception):
@@ -259,6 +260,12 @@ class BudgetBaseline:
                 f"Period budget taken from the budget column of the uploaded "
                 f"report{f' ({self.origin_label})' if self.origin_label else ''}."
             )
+        if self.source == BUDGET_SOURCE_SPIRE:
+            return (
+                f"Annual budget pulled live from Spire"
+                f"{f' ({self.origin_label})' if self.origin_label else ''}, prorated "
+                f"to the period."
+            )
         return (
             f"Annual budget from the file uploaded with this report"
             f"{f' ({self.origin_label})' if self.origin_label else ''}, prorated "
@@ -320,6 +327,27 @@ def baseline_from_annual_budget(budget: ParsedReport, cadence: str) -> BudgetBas
         )
     return BudgetBaseline(
         source=BUDGET_SOURCE_UPLOADED,
+        cadence=cadence,
+        annual_by_category=annual,
+        origin_label=budget.filename,
+        warnings=list(budget.warnings),
+    )
+
+
+def baseline_from_spire_budget(budget: ParsedReport, cadence: str) -> BudgetBaseline:
+    """
+    Build a baseline from a budget pulled live from Spire's GL/Budgets endpoint
+    (via perseus_bot.spire_adapter.budget_from_spire). Same shape and rollup as
+    an uploaded annual budget file — only the recorded source and description
+    differ, so staff can see at a glance where the baseline came from.
+    """
+    annual = _rollup_budget(budget.expense_lines, lambda ln: ln.budget or ln.actual)
+    if not annual:
+        raise MissingBaselineError(
+            f"No budget amounts could be read from Spire for '{budget.filename}'."
+        )
+    return BudgetBaseline(
+        source=BUDGET_SOURCE_SPIRE,
         cadence=cadence,
         annual_by_category=annual,
         origin_label=budget.filename,

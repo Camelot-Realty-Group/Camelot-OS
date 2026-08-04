@@ -85,6 +85,17 @@ services:
       # deterministic per-category mechanism text is used and no figure changes.
       - key: OPENAI_API_KEY
         sync: false
+      # Optional — pulls a period's GL actuals (and optionally the budget
+      # baseline) directly from Camelot's Spire property-management API
+      # instead of a manual file upload. Without these, the "Pull from Spire"
+      # option is disabled on the upload form and manual upload keeps working.
+      - key: SPIRE_API_KEY
+        sync: false
+      - key: SPIRE_CLIENT_SECRET
+        sync: false
+      # Optional — defaults to https://camelot.spiremds.com/api if unset.
+      - key: SPIRE_BASE_URL
+        sync: false
 
   # ---------------------------------------------------------------------------
   # OPTIONAL: daily Scout Bot run (uncomment to enable)

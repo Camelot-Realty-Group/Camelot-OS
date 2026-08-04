@@ -38,10 +38,12 @@ CREATE TABLE IF NOT EXISTS perseus_variance_reports (
     market                        TEXT,
 
     -- Where the budget baseline came from
-    budget_source                 TEXT,           -- 'costbeat_analysis' | 'uploaded' | 'report_column'
+    budget_source                 TEXT,           -- 'costbeat_analysis' | 'uploaded' | 'report_column' | 'spire'
     linked_costbeat_analysis_id   UUID,           -- set only when budget_source = 'costbeat_analysis'
     uploaded_filename             TEXT,
-    source_format                 TEXT,           -- parser layout: columnar | gl_hierarchy | flat | mds_pdf
+    source_format                 TEXT,           -- parser layout: columnar | gl_hierarchy | flat | mds_pdf | spire_gl_actuals | spire_budget
+    data_source                   TEXT DEFAULT 'upload', -- 'upload' | 'spire' — where the period actuals came from
+    spire_building_id              TEXT,           -- Spire CompanyRcd, set only when data_source = 'spire'
 
     -- Budget vs. actual, for the period reported
     total_budget_period           NUMERIC(14,2),
@@ -99,7 +101,19 @@ COMMENT ON TABLE perseus_variance_reports IS
     'One management-report period per row. Self-contained: the fee proposal on a row prices only that period''s findings and is never carried forward.';
 
 COMMENT ON COLUMN perseus_variance_reports.budget_source IS
-    'costbeat_analysis = baseline pulled from a CostBeat annual-budget analysis; uploaded = a separate budget file was uploaded alongside the actuals; report_column = the budget column inside the uploaded report was used.';
+    'costbeat_analysis = baseline pulled from a CostBeat annual-budget analysis; uploaded = a separate budget file was uploaded alongside the actuals; report_column = the budget column inside the uploaded report was used; spire = pulled live from Spire''s GL/Budgets endpoint.';
+
+COMMENT ON COLUMN perseus_variance_reports.data_source IS
+    'upload = actuals came from a manually uploaded file (default, always available); spire = actuals were pulled live from Camelot''s Spire property-management API for the period.';
+
+-- =============================================================================
+-- Migration note (existing databases): if perseus_variance_reports already
+-- exists from before Spire sourcing was added, run just these two lines
+-- against it — CREATE TABLE IF NOT EXISTS above is a no-op once the table
+-- exists, so new columns need to be added explicitly:
+--   ALTER TABLE perseus_variance_reports ADD COLUMN IF NOT EXISTS data_source TEXT DEFAULT 'upload';
+--   ALTER TABLE perseus_variance_reports ADD COLUMN IF NOT EXISTS spire_building_id TEXT;
+-- =============================================================================
 
 COMMENT ON COLUMN perseus_variance_reports.portfolio_savings_opportunity IS
     'Annualized gap between this building''s run-rate and the Camelot portfolio average per unit. Own-budget overruns are NOT counted here — a building''s budget is a plan, not a market price.';
