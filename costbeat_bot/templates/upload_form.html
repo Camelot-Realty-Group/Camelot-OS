@@ -262,6 +262,32 @@
 
     .hidden { display: none; }
 
+    .source-toggle {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid rgba(201, 168, 76, 0.2);
+    }
+
+    .source-option {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--white);
+      text-transform: none;
+      letter-spacing: normal;
+      cursor: pointer;
+    }
+
+    .source-option input { width: auto; }
+
+    .source-option.disabled { color: var(--grey-dim); cursor: not-allowed; }
+
     footer {
       text-align: center;
       color: var(--grey-dim);
@@ -289,14 +315,41 @@
 
   <form class="card" id="form">
     <h2>Building &amp; Budget</h2>
+
+    <div class="source-toggle" id="source-toggle">
+      <label class="source-option">
+        <input type="radio" name="data_source" value="spire" id="source-spire" />
+        Pull from Spire
+      </label>
+      <label class="source-option">
+        <input type="radio" name="data_source" value="upload" id="source-upload" checked />
+        Upload a file
+      </label>
+      <span class="hint" id="source-note"></span>
+    </div>
+
+    <div class="grid" id="spire-fields">
+      <div class="full">
+        <label for="spire_building_id">Building (from Spire) <span class="req">*</span></label>
+        <select id="spire_building_id" name="spire_building_id">
+          <option value="">Loading buildings…</option>
+        </select>
+        <div class="hint">Property name, address, and unit count auto-fill from the selected building.</div>
+      </div>
+      <div>
+        <label for="spire_year">Budget year <span class="req">*</span></label>
+        <input id="spire_year" name="spire_year" type="number" min="2000" max="2100" placeholder="e.g. 2026" />
+      </div>
+    </div>
+
     <div class="grid">
       <div>
         <label for="property_name">Property name <span class="req">*</span></label>
-        <input id="property_name" name="property_name" required placeholder="e.g. 245 East 87th Street" />
+        <input id="property_name" name="property_name" placeholder="e.g. 245 East 87th Street" />
       </div>
       <div>
         <label for="unit_count">Unit count <span class="req">*</span></label>
-        <input id="unit_count" name="unit_count" type="number" min="1" required placeholder="e.g. 34" />
+        <input id="unit_count" name="unit_count" type="number" min="1" placeholder="e.g. 34" />
         <div class="hint">Used to compare on a per-unit basis.</div>
       </div>
       <div>
@@ -317,9 +370,9 @@
         <label for="address">Address</label>
         <input id="address" name="address" placeholder="Street address" />
       </div>
-      <div class="full">
+      <div class="full" id="upload-field">
         <label for="budget_file">Operating budget <span class="req">*</span></label>
-        <input id="budget_file" name="budget_file" type="file" accept=".xlsx,.xls,.csv,.pdf" required />
+        <input id="budget_file" name="budget_file" type="file" accept=".xlsx,.xls,.csv,.pdf" />
         <div class="hint">.xlsx, .csv, or .pdf. PDF uploads are flagged for figure verification.</div>
       </div>
       <div class="full">
@@ -412,17 +465,108 @@ const FEE_LABELS = {
   mgmt_fee_uplift: 'Management-fee uplift',
 };
 
+// ---------------------------------------------------------------------------
+// Data source toggle: "Pull from Spire" vs "Upload a file"
+// ---------------------------------------------------------------------------
+let spireBuildings = [];
+
+function currentSource() {
+  return document.querySelector('input[name="data_source"]:checked').value;
+}
+
+function applySourceVisibility() {
+  const source = currentSource();
+  const isSpire = source === 'spire';
+  $('spire-fields').classList.toggle('hidden', !isSpire);
+  $('upload-field').classList.toggle('hidden', isSpire);
+  $('budget_file').required = !isSpire;
+  $('spire_building_id').required = isSpire;
+  $('spire_year').required = isSpire;
+  // Manual fields stay required either way, but when pulling from Spire
+  // they're auto-filled from the selected building so relax the constraint
+  // until a building is actually chosen.
+  $('property_name').required = !isSpire;
+  $('unit_count').required = !isSpire;
+}
+
+async function loadSpireBuildings() {
+  const toggle = $('source-toggle');
+  const spireRadio = $('source-spire');
+  const spireLabel = spireRadio.closest('.source-option');
+  const note = $('source-note');
+  const select = $('spire_building_id');
+
+  try {
+    const response = await fetch('/spire/buildings');
+    const payload = await response.json();
+
+    if (!payload.configured) {
+      spireRadio.disabled = true;
+      spireLabel.classList.add('disabled');
+      note.textContent = 'Spire is not configured on this server — using file upload.';
+      $('source-upload').checked = true;
+      applySourceVisibility();
+      return;
+    }
+
+    spireBuildings = payload.buildings || [];
+    if (!spireBuildings.length) {
+      spireRadio.disabled = true;
+      spireLabel.classList.add('disabled');
+      note.textContent = 'Spire is configured but no buildings could be loaded — using file upload.';
+      $('source-upload').checked = true;
+      applySourceVisibility();
+      return;
+    }
+
+    select.innerHTML = '<option value="">Select a building\u2026</option>' + spireBuildings.map((b) =>
+      `<option value="${esc(b.building_id)}">${esc(b.name)}${b.address ? ' — ' + esc(b.address) : ''}</option>`
+    ).join('');
+
+    // Default to Spire mode when it's configured and buildings are available.
+    spireRadio.checked = true;
+    note.textContent = `${spireBuildings.length} building(s) available from Spire.`;
+    applySourceVisibility();
+  } catch (error) {
+    spireRadio.disabled = true;
+    spireLabel.classList.add('disabled');
+    note.textContent = 'Could not reach Spire — using file upload.';
+    $('source-upload').checked = true;
+    applySourceVisibility();
+  }
+}
+
+document.querySelectorAll('input[name="data_source"]').forEach((el) =>
+  el.addEventListener('change', applySourceVisibility)
+);
+
+$('spire_building_id').addEventListener('change', (event) => {
+  const building = spireBuildings.find((b) => String(b.building_id) === event.target.value);
+  if (!building) return;
+  $('property_name').value = building.name || '';
+  $('address').value = building.address || '';
+  if (building.unit_count) $('unit_count').value = building.unit_count;
+});
+
+applySourceVisibility();
+loadSpireBuildings();
+
 $('form').addEventListener('submit', async (event) => {
   event.preventDefault();
   const status = $('status');
   status.className = '';
-  status.textContent = 'Parsing the budget and pulling comparables…';
+  status.textContent = 'Sourcing the budget and pulling comparables…';
   $('submit').disabled = true;
 
   try {
+    const formData = new FormData($('form'));
+    // Don't send an empty file field when pulling from Spire.
+    if (currentSource() === 'spire') {
+      formData.delete('budget_file');
+    }
     const response = await fetch('/analyze', {
       method: 'POST',
-      body: new FormData($('form')),
+      body: formData,
     });
     const payload = await response.json();
     if (!response.ok) {

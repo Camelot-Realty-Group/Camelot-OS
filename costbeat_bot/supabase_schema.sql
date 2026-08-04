@@ -40,8 +40,13 @@ CREATE TABLE IF NOT EXISTS costbeat_analyses (
     notes                    TEXT,
     status                   TEXT DEFAULT 'draft',
     created_by               TEXT,
-    created_at               TIMESTAMPTZ DEFAULT now()
+    created_at               TIMESTAMPTZ DEFAULT now(),
+    data_source              TEXT DEFAULT 'upload'  -- 'upload' (manual file) or 'spire' (Spire API pull)
 );
+
+-- Additive/idempotent — lets this run safely against a table created before
+-- the Spire integration existed.
+ALTER TABLE costbeat_analyses ADD COLUMN IF NOT EXISTS data_source TEXT DEFAULT 'upload';
 
 CREATE INDEX IF NOT EXISTS idx_costbeat_analyses_created_at
     ON costbeat_analyses (created_at DESC);

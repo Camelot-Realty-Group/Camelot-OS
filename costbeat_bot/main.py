@@ -18,7 +18,9 @@ import argparse
 import logging
 import os
 import sys
+import time
 from pathlib import Path
+from typing import Optional
 
 BOT_DIR = Path(__file__).parent.resolve()
 if str(BOT_DIR) not in sys.path:
@@ -78,7 +80,8 @@ def run_api_server(host: str = "0.0.0.0", port: int = 8005) -> None:
     import report_generator
     import storage
 
-    # Audit trail (repo root on path when run from root or via Docker PYTHONPATH)
+    # Audit trail + Spire client (repo root on path when run from root or via
+    # Docker PYTHONPATH).
     try:
         from utils.audit_log import audit_event
     except ImportError:
@@ -90,8 +93,50 @@ def run_api_server(host: str = "0.0.0.0", port: int = 8005) -> None:
                 logger.info("AUDIT (fallback): %s", kwargs)
                 return kwargs
 
+    try:
+        from utils.spire_client import (
+            SpireClient,
+            SpireError,
+            spire_budget_to_parsed_budget,
+        )
+    except ImportError:
+        sys.path.insert(0, str(BOT_DIR.parent))
+        from utils.spire_client import (  # noqa: E402
+            SpireClient,
+            SpireError,
+            spire_budget_to_parsed_budget,
+        )
+
     cfg = load_config()
     analyses_table = cfg["supabase"]["analyses_table"]
+
+    # ── Spire buildings cache ────────────────────────────────────────────
+    # A small in-memory cache (~10 min) so the building dropdown doesn't hit
+    # Spire on every page load. Spire being unconfigured or unreachable is a
+    # normal, handled condition — it just disables the "Pull from Spire"
+    # option in the UI and manual upload keeps working.
+    SPIRE_BUILDINGS_CACHE_TTL_SECONDS = 600
+    _spire_buildings_cache: dict = {"buildings": None, "fetched_at": 0.0, "error": None}
+
+    def _spire_configured() -> bool:
+        return bool(os.getenv("SPIRE_API_KEY") and os.getenv("SPIRE_CLIENT_SECRET"))
+
+    def _get_spire_buildings(force: bool = False) -> list[dict]:
+        now = time.monotonic()
+        if not force and _spire_buildings_cache["buildings"] is not None and (
+            now - _spire_buildings_cache["fetched_at"] < SPIRE_BUILDINGS_CACHE_TTL_SECONDS
+        ):
+            return _spire_buildings_cache["buildings"]
+
+        try:
+            client = SpireClient()
+            buildings = [b.as_dict() for b in client.list_buildings()]
+            _spire_buildings_cache.update(buildings=buildings, fetched_at=now, error=None)
+            return buildings
+        except SpireError as exc:
+            logger.warning("Spire buildings lookup unavailable: %s", exc)
+            _spire_buildings_cache.update(buildings=None, fetched_at=now, error=str(exc))
+            return []
 
     app = FastAPI(
         title="Camelot CostBeat Bot",
@@ -153,7 +198,26 @@ def run_api_server(host: str = "0.0.0.0", port: int = 8005) -> None:
             "service": "Camelot CostBeat Bot",
             "supabase_configured": bool(os.getenv("SUPABASE_URL") and os.getenv("SUPABASE_SERVICE_KEY")),
             "llm_configured": bool(os.getenv("OPENAI_API_KEY")),
+            "spire_configured": _spire_configured(),
         }
+
+    @app.get("/spire/buildings")
+    async def spire_buildings():
+        """
+        Proxy route for the upload form's building dropdown. Backed by
+        SpireClient.list_buildings(), cached in memory for ~10 minutes.
+        Returns an empty, non-error list when Spire isn't configured or is
+        unreachable — the UI treats that as "disable Spire mode, use upload".
+        """
+        if not _spire_configured():
+            return JSONResponse({"configured": False, "buildings": []})
+        buildings = _get_spire_buildings()
+        return JSONResponse({
+            "configured": True,
+            "available": bool(buildings),
+            "buildings": buildings,
+            "error": _spire_buildings_cache.get("error") if not buildings else None,
+        })
 
     @app.get("/", response_class=HTMLResponse)
     async def upload_page():
@@ -164,16 +228,89 @@ def run_api_server(host: str = "0.0.0.0", port: int = 8005) -> None:
 
     @app.post("/analyze")
     async def analyze_budget(
-        budget_file: UploadFile = File(..., description="Operating budget (.xlsx, .csv, .pdf)"),
-        property_name: str = Form(...),
+        budget_file: Optional[UploadFile] = File(
+            None, description="Operating budget (.xlsx, .csv, .pdf). Omit when data_source=spire."
+        ),
+        property_name: str = Form(""),
         address: str = Form(""),
-        unit_count: int = Form(...),
+        unit_count: int = Form(0),
         building_type: str = Form(""),
         market: str = Form(""),
         notes: str = Form(""),
         created_by: str = Form("api"),
+        data_source: str = Form("upload", description="'upload' (default, manual file) or 'spire'"),
+        spire_building_id: Optional[int] = Form(
+            None, description="Required when data_source=spire — BuildingRcd from /spire/buildings"
+        ),
+        spire_year: Optional[int] = Form(
+            None, description="Required when data_source=spire — fiscal year to pull the budget for"
+        ),
     ):
-        """Run the full pipeline: parse → benchmark → analyze → price → persist → render."""
+        """
+        Run the full pipeline: source the budget → benchmark → analyze → price → persist → render.
+
+        Two ways to source the budget (data_source):
+          "upload" (default) — manual file upload, exactly as before.
+          "spire"             — pulled live from Spire via SpireClient.get_budget(),
+                                using spire_building_id + spire_year. property_name/
+                                address/unit_count are auto-filled from the Spire
+                                building record when not supplied.
+        """
+        uploaded_filename: Optional[str] = None
+
+        if data_source == "spire":
+            if not spire_building_id or not spire_year:
+                raise HTTPException(
+                    status_code=400,
+                    detail="spire_building_id and spire_year are required when data_source=spire.",
+                )
+            if not _spire_configured():
+                raise HTTPException(
+                    status_code=503,
+                    detail="Spire is not configured on this server — use file upload instead.",
+                )
+
+            try:
+                client = SpireClient()
+                spire_buildings = {b.building_id: b for b in client.list_buildings()}
+                building = spire_buildings.get(spire_building_id)
+                if building is None:
+                    raise HTTPException(
+                        status_code=404,
+                        detail=f"Spire building {spire_building_id} was not found.",
+                    )
+                # Auto-fill from the Spire record unless the caller overrode it.
+                property_name = property_name or building.name
+                address = address or building.address
+                unit_count = unit_count or (building.unit_count or 0)
+
+                line_items = client.get_budget(spire_building_id, spire_year)
+                parsed = spire_budget_to_parsed_budget(
+                    line_items, building_name=building.name or str(spire_building_id), year=spire_year,
+                )
+            except SpireError as exc:
+                audit_event(bot="costbeat", action="analyze_budget", outcome="error",
+                            detail={"property_name": property_name, "reason": "spire_failed"})
+                raise HTTPException(
+                    status_code=502, detail=f"Could not pull the budget from Spire: {exc}. "
+                                             f"Use file upload instead.",
+                ) from exc
+            uploaded_filename = f"spire:{spire_building_id}:{spire_year}"
+        else:
+            if budget_file is None:
+                raise HTTPException(
+                    status_code=400,
+                    detail="budget_file is required when data_source is 'upload'.",
+                )
+            content = await budget_file.read()
+            try:
+                parsed = budget_parser.parse_budget(content, budget_file.filename or "budget")
+            except budget_parser.BudgetParseError as exc:
+                audit_event(bot="costbeat", action="analyze_budget", outcome="error",
+                            detail={"property_name": property_name, "reason": "parse_failed"})
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+            uploaded_filename = budget_file.filename
+
         if unit_count <= 0:
             raise HTTPException(status_code=400, detail="unit_count must be greater than zero.")
         if building_type and building_type not in BUILDING_TYPES:
@@ -181,14 +318,6 @@ def run_api_server(host: str = "0.0.0.0", port: int = 8005) -> None:
                 status_code=400,
                 detail=f"building_type must be one of {list(BUILDING_TYPES)}.",
             )
-
-        content = await budget_file.read()
-        try:
-            parsed = budget_parser.parse_budget(content, budget_file.filename or "budget")
-        except budget_parser.BudgetParseError as exc:
-            audit_event(bot="costbeat", action="analyze_budget", outcome="error",
-                        detail={"property_name": property_name, "reason": "parse_failed"})
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
         try:
             comps = benchmarks_module.fetch_benchmarks(unit_count, building_type or None, market or None)
@@ -209,7 +338,8 @@ def run_api_server(host: str = "0.0.0.0", port: int = 8005) -> None:
             **{k: v for k, v in analysis.as_dict().items()
                if k in {"property_name", "address", "unit_count", "building_type", "market",
                         "total_budget", "total_target", "total_savings", "savings_pct"}},
-            "uploaded_filename": budget_file.filename,
+            "uploaded_filename": uploaded_filename,
+            "data_source": data_source,
             "one_time_fee": round(proposal.one_time.camelot_year1, 2),
             "mgmt_fee_uplift_monthly": round(proposal.uplift.monthly_amount, 2),
             "mgmt_fee_uplift_annual": round(proposal.uplift.camelot_annual_ongoing, 2),
@@ -239,7 +369,8 @@ def run_api_server(host: str = "0.0.0.0", port: int = 8005) -> None:
                 "analysis_id": analysis_id,
                 "property_name": property_name,
                 "unit_count": unit_count,
-                "uploaded_filename": budget_file.filename,
+                "uploaded_filename": uploaded_filename,
+                "data_source": data_source,
                 "total_budget": round(analysis.total_budget, 2),
                 "total_savings": round(analysis.total_savings, 2),
                 "recommended_fee_model": proposal.recommended_model,
