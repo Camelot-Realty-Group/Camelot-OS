@@ -239,8 +239,8 @@ def run_api_server(host: str = "0.0.0.0", port: int = 8005) -> None:
         notes: str = Form(""),
         created_by: str = Form("api"),
         data_source: str = Form("upload", description="'upload' (default, manual file) or 'spire'"),
-        spire_building_id: Optional[int] = Form(
-            None, description="Required when data_source=spire — BuildingRcd from /spire/buildings"
+        spire_building_id: Optional[str] = Form(
+            None, description="Required when data_source=spire — building_id (CompanyRcd) from /spire/buildings"
         ),
         spire_year: Optional[int] = Form(
             None, description="Required when data_source=spire — fiscal year to pull the budget for"
@@ -273,7 +273,7 @@ def run_api_server(host: str = "0.0.0.0", port: int = 8005) -> None:
             try:
                 client = SpireClient()
                 spire_buildings = {b.building_id: b for b in client.list_buildings()}
-                building = spire_buildings.get(spire_building_id)
+                building = spire_buildings.get(str(spire_building_id))
                 if building is None:
                     raise HTTPException(
                         status_code=404,

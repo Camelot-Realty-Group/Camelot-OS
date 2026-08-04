@@ -5,6 +5,7 @@
 #   camelot-os-orchestrator — master router + dashboard (FastAPI, port from $PORT)
 #   camelot-os-concierge    — document template catalog & auto-fill API
 #   camelot-os-costbeat     — operating-budget cost-beat analysis & fee proposal
+#   camelot-os-perseus      — periodic management-report variance engine
 #
 # The other bots (Scout, Broker, Report, Deal, Compliance, Front Desk, Index)
 # run as local subprocesses / cron jobs or via docker-compose on a VM — they
@@ -84,6 +85,51 @@ services:
       # Optional — prose polish only. Without it the deterministic
       # per-category mechanism text is used.
       - key: OPENAI_API_KEY
+        sync: false
+      # Optional — pulls a period's GL actuals (and optionally the budget
+      # baseline) directly from Camelot's Spire property-management API
+      # instead of a manual file upload. Without these, the "Pull from Spire"
+      # option is disabled on the upload form and manual upload keeps working.
+      - key: SPIRE_API_KEY
+        sync: false
+      - key: SPIRE_CLIENT_SECRET
+        sync: false
+      # Optional — defaults to https://camelot.spiremds.com/api if unset.
+      - key: SPIRE_BASE_URL
+        sync: false
+
+  - type: web
+    name: camelot-os-perseus
+    runtime: python
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: python perseus_bot/main.py --serve --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11"
+      - key: LOG_LEVEL
+        value: INFO
+      # Required — stores every period report and reads portfolio comparables.
+      # Run perseus_bot/supabase_schema.sql in the Supabase SQL editor first.
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      # Optional — rephrases recommendation prose only. Without it the
+      # deterministic per-category mechanism text is used and no figure changes.
+      - key: OPENAI_API_KEY
+        sync: false
+      # Optional — pulls a period's GL actuals (and optionally the budget
+      # baseline) directly from Camelot's Spire property-management API
+      # instead of a manual file upload. Without these, the "Pull from Spire"
+      # option is disabled on the upload form and manual upload keeps working.
+      - key: SPIRE_API_KEY
+        sync: false
+      - key: SPIRE_CLIENT_SECRET
+        sync: false
+      # Optional — defaults to https://camelot.spiremds.com/api if unset.
+      - key: SPIRE_BASE_URL
         sync: false
 
   # ---------------------------------------------------------------------------

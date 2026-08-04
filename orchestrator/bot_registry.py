@@ -363,6 +363,42 @@ BOTS: Dict[str, Dict[str, Any]] = {
         "icon": "🤝",
         "color": "#1ABC9C",
     },
+
+    "perseus": {
+        "name": "Perseus",
+        "description": (
+            "Quarterly management-report variance engine — compares actuals to a "
+            "building's own budget and to Camelot's portfolio averages, and produces "
+            "a standalone per-period savings/fee proposal."
+        ),
+        "capabilities": [
+            "analyze_period_report",  # Parse a period's actuals (Excel or MDS PDF) and analyze
+            "budget_variance",        # Line-by-line actual vs. prorated budget share
+            "portfolio_comparison",   # Annualized run-rate vs. portfolio average per unit
+            "flag_overruns",          # Categories running over their prorated budget share
+            "build_fee_proposal",     # One-time fee vs. management-fee uplift for the period
+            "generate_variance_pdf",  # Client-facing variance + proposal PDF
+            "list_period_reports",    # Prior periods for a building
+        ],
+        "data_sources": [
+            "Uploaded management reports (Excel/CSV exports, MDS PDFs)",
+            "Supabase portfolio_benchmarks (cross-portfolio category comparables)",
+            "Supabase costbeat_analyses (budget baseline, when on file)",
+            "Supabase perseus_variance_reports (period history)",
+        ],
+        "entry_point": "perseus_bot/main.py",
+        "api_endpoint": "http://perseus_bot:8006",
+        "api_port": 8006,
+        "health_check": "http://perseus_bot:8006/health",
+        "timeout_seconds": 120,
+        "requires_env": [
+            "SUPABASE_URL",
+            "SUPABASE_SERVICE_KEY",
+            "OPENAI_API_KEY",
+        ],
+        "icon": "📉",
+        "color": "#34495E",
+    },
 }
 
 
