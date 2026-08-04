@@ -31,6 +31,8 @@ BOTS: Dict[str, Dict[str, Any]] = {
             "market_comp",           # Comparable market analysis for a submarket
             "build_lead_list",       # Batch lead generation with filtering
             "check_ownership",       # Identify beneficial ownership via ACRIS
+            "lead_hunt",             # POST /lead-hunt/run (--serve mode) — NYC Open Data scan -> score -> scout_buildings/scout_scans
+            "merlin_poll_inbox",     # POST /merlin/poll-inbox (--serve mode) — outreach mailbox poll -> reply match -> merlin_inbound_messages
         ],
         "data_sources": [
             "NYC Open Data (HPD, DOB, ACRIS)",
@@ -42,9 +44,16 @@ BOTS: Dict[str, Dict[str, Any]] = {
             "PropertyRadar",
         ],
         "entry_point": "scout_bot/main.py",
+        # scout_bot gained a FastAPI --serve mode (python main.py --serve,
+        # default port 8007: GET /health, POST /lead-hunt/run,
+        # POST /merlin/poll-inbox) alongside costbeat_bot/perseus_bot's
+        # convention, but there is still no deployed Render service for it
+        # (render.yaml only has a commented-out cron block for scout_bot) —
+        # api_endpoint/api_port/health_check stay None until that exists, so
+        # this registry never advertises a URL nothing is listening on.
         "api_endpoint": None,          # Runs as local subprocess
-        "api_port": None,
-        "health_check": None,
+        "api_port": None,              # would be 8007 once deployed via --serve
+        "health_check": None,          # would be http://scout_bot:8007/health once deployed
         "timeout_seconds": 60,
         "requires_env": [
             "HUBSPOT_API_KEY",
@@ -52,6 +61,9 @@ BOTS: Dict[str, Dict[str, Any]] = {
             "GOOGLE_MAPS_API_KEY",
             "SUPABASE_URL",
             "SUPABASE_SERVICE_KEY",
+            "MERLIN_IMAP_HOST",       # required only for POST /merlin/poll-inbox — see scout_bot/.env.example
+            "MERLIN_IMAP_USER",
+            "MERLIN_IMAP_PASSWORD",
         ],
         "icon": "🔭",
         "color": "#4A90D9",

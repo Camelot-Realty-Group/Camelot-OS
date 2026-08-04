@@ -12,6 +12,7 @@ for p in (
     REPO_ROOT / "orchestrator",
     REPO_ROOT / "concierge_bot",
     REPO_ROOT / "costbeat_bot",
+    REPO_ROOT / "scout_bot",
 ):
     if str(p) not in sys.path:
         sys.path.insert(0, str(p))
