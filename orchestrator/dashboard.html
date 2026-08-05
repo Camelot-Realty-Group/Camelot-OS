@@ -782,7 +782,7 @@
   // ---------------------------------------------------------------------------
   // Config
   // ---------------------------------------------------------------------------
-  const API_BASE = 'http://localhost:8000';   // Change to your deployed URL
+  const API_BASE = window.location.origin;   // Same-origin: works locally and on Render
   const WS_BASE  = API_BASE.replace('http', 'ws');
 
   // ---------------------------------------------------------------------------
