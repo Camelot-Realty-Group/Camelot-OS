@@ -35,7 +35,7 @@ from fastapi import (
     status,
 )
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
 
 # Camelot OS internal modules
@@ -336,9 +336,29 @@ async def _refresh_health_cache():
 # Routes
 # ---------------------------------------------------------------------------
 
-@app.get("/", tags=["Meta"])
+_DASHBOARD_PATH = os.path.join(os.path.dirname(__file__), "dashboard.html")
+
+
+@app.get("/", tags=["Meta"], response_class=FileResponse)
 async def root():
-    """API root — confirms the orchestrator is live."""
+    """Serve the Camelot OS operations dashboard UI."""
+    if os.path.isfile(_DASHBOARD_PATH):
+        return FileResponse(_DASHBOARD_PATH, media_type="text/html")
+    # Fallback if the dashboard file is ever missing from the deploy.
+    return JSONResponse(
+        {
+            "service": "Camelot OS Orchestrator",
+            "version": "1.0.0",
+            "status": "online",
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "endpoints": ["/chat", "/pipeline", "/bots", "/status", "/pipelines", "/ws/{session_id}"],
+        }
+    )
+
+
+@app.get("/api", tags=["Meta"])
+async def api_info():
+    """API root info — confirms the orchestrator is live (JSON, for scripts/monitoring)."""
     return {
         "service": "Camelot OS Orchestrator",
         "version": "1.0.0",
